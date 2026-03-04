@@ -1,0 +1,17 @@
+## Interface: 120001
+## Title: Better UI
+## Notes: Provides some QoL tweaks for default UI.
+## Author: DmitriyKost
+## Version: 1.0
+## IconTexture: Interface\AddOns\BetterUI\Keg_Icon
+## SavedVariables: BetterUIDB
+
+Core.lua
+Settings.lua
+StaggerBar.lua
+BlackOxStatueRemoval.lua
+HealthBar.lua
+Performance.lua
+ActionBarBorderHider.lua
+ActionBarMacroTextHider.lua
+CharSecondaryStatRatings.lua
