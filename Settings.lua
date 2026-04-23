@@ -89,12 +89,35 @@ local function SetSliderEnabled(slider, enabled)
 	end
 end
 
+local function CreateScrollableContent(panel)
+	local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+	scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -8)
+	scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -32, 8)
+
+	local content = CreateFrame("Frame", nil, scroll)
+	content:SetSize(1, 1)
+	scroll:SetScrollChild(content)
+
+	panel._buiScrollFrame = scroll
+	panel._buiScrollContent = content
+
+	panel:HookScript("OnSizeChanged", function(self, width)
+		if self._buiScrollContent then
+			self._buiScrollContent:SetWidth(math.max(1, width - 48))
+		end
+	end)
+
+	return content
+end
+
 local function BuildPanelUI(panel)
-	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local root = CreateScrollableContent(panel)
+
+	local title = root:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 16, -16)
 	title:SetText(ADDON_NAME)
 
-	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local sub = root:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 	sub:SetText("Quality-of-life tools and small UI enhancements.")
 
@@ -102,17 +125,17 @@ local function BuildPanelUI(panel)
 	panel._buiChecks = {}
 
 	do
-		local bHdr = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		local bHdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		bHdr:SetPoint("TOPLEFT", 16, y)
 		bHdr:SetText("Brewmaster")
 		y = y - 24
 
 		panel._buiChecks[#panel._buiChecks + 1] =
-			CreateCheckbox(panel, "Enable Stagger bar overlays", "Custom stagger text overlays.", "enableStaggerBar", y)
+			CreateCheckbox(root, "Enable Stagger bar overlays", "Custom stagger text overlays.", "enableStaggerBar", y)
 		y = y - 30
 
 		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
-			panel,
+			root,
 			"Enable Black Ox statue removal buttons",
 			"Creates /click-safe destroytotem buttons.",
 			"enableStatueKill",
@@ -122,17 +145,17 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local gHdr = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		local gHdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		gHdr:SetPoint("TOPLEFT", 16, y)
 		gHdr:SetText("General")
 		y = y - 24
 
 		panel._buiChecks[#panel._buiChecks + 1] =
-			CreateCheckbox(panel, "Enable Health bar overlays", "HP% / HP / Absorbs overlays.", "enableHealthBar", y)
+			CreateCheckbox(root, "Enable Health bar overlays", "HP% / HP / Absorbs overlays.", "enableHealthBar", y)
 		y = y - 30
 
 		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
-			panel,
+			root,
 			"Show secondary stat rating in Character window",
 			"Adds the numeric rating next to the % value (uses Blizzard's same font styling).",
 			"enableCharSecondaryStatRatings",
@@ -142,12 +165,12 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		label:SetPoint("TOPLEFT", 16, y)
 		label:SetText("Hide ActionBar borders (IDs, e.g. 1,7,8)")
 		y = y - 22
 
-		local edit = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
 		edit:SetSize(220, 20)
 		edit:SetAutoFocus(false)
 		edit:SetPoint("TOPLEFT", 16, y)
@@ -185,12 +208,12 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		label:SetPoint("TOPLEFT", 16, y)
 		label:SetText("Hide ActionBar macro text (IDs, e.g. 1,7,8)")
 		y = y - 22
 
-		local edit = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
 		edit:SetSize(220, 20)
 		edit:SetAutoFocus(false)
 		edit:SetPoint("TOPLEFT", 16, y)
@@ -225,7 +248,48 @@ local function BuildPanelUI(panel)
 		y = y - 40
 	end
 
-	local hdr = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	do
+		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		label:SetPoint("TOPLEFT", 16, y)
+		label:SetText("Make ActionBars clickthrough (IDs, e.g. 1,7,8)")
+		y = y - 22
+
+		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
+		edit:SetSize(220, 20)
+		edit:SetAutoFocus(false)
+		edit:SetPoint("TOPLEFT", 16, y)
+		edit:SetMaxLetters(64)
+
+		local function Save()
+			_G.BetterUIDB = _G.BetterUIDB or {}
+			_G.BetterUIDB.clickThroughActionBars = (edit:GetText() or ""):gsub("%s+", "")
+			NS.DB = _G.BetterUIDB
+
+			if NS.ApplySettings then
+				NS.ApplySettings()
+			end
+			if NS.FireSettingChanged then
+				NS.FireSettingChanged()
+			end
+		end
+
+		edit:SetScript("OnEnterPressed", function(self)
+			self:ClearFocus()
+			Save()
+		end)
+		edit:SetScript("OnEditFocusLost", Save)
+
+		edit:SetScript("OnEscapePressed", function(self)
+			local db = _G.BetterUIDB or NS.DB or {}
+			self:SetText(db.clickThroughActionBars or "")
+			self:ClearFocus()
+		end)
+
+		panel._buiActionBarClickThroughEdit = edit
+		y = y - 40
+	end
+
+	local hdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	hdr:SetPoint("TOPLEFT", 16, y)
 	hdr:SetText("Performance Monitor")
 	y = y - 24
@@ -252,7 +316,7 @@ local function BuildPanelUI(panel)
 	panel._buiPerfHeader = hdr
 
 	panel._buiPerfEnable = CreateCheckbox(
-		panel,
+		root,
 		"Enable performance monitor text",
 		"Movable text showing FPS / H lat / W lat (toggle what to show below).",
 		"enablePerformanceMonitor",
@@ -264,21 +328,21 @@ local function BuildPanelUI(panel)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfEnable
 	y = y - 30
 
-	panel._buiPerfShowFPS = CreateCheckbox(panel, "Show FPS", "Show current FPS.", "perfShowFPS", y)
+	panel._buiPerfShowFPS = CreateCheckbox(root, "Show FPS", "Show current FPS.", "perfShowFPS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowFPS
 	y = y - 30
 
-	panel._buiPerfShowHome = CreateCheckbox(panel, "Show Home latency", "Show Home latency (ms).", "perfShowHomeMS", y)
+	panel._buiPerfShowHome = CreateCheckbox(root, "Show Home latency", "Show Home latency (ms).", "perfShowHomeMS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowHome
 	y = y - 30
 
 	panel._buiPerfShowWorld =
-		CreateCheckbox(panel, "Show World latency", "Show World latency (ms).", "perfShowWorldMS", y)
+		CreateCheckbox(root, "Show World latency", "Show World latency (ms).", "perfShowWorldMS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowWorld
 	y = y - 30
 
 	panel._buiPerfLocked = CreateCheckbox(
-		panel,
+		root,
 		"Lock performance frame",
 		"Prevents dragging (disables mouse on the frame).",
 		"perfLocked",
@@ -288,7 +352,7 @@ local function BuildPanelUI(panel)
 	y = y - 50
 
 	do
-		local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
+		local slider = CreateFrame("Slider", nil, root, "OptionsSliderTemplate")
 		slider:SetPoint("TOPLEFT", 16, y)
 		slider:SetMinMaxValues(8, 24)
 		slider:SetValueStep(1)
@@ -342,6 +406,8 @@ local function BuildPanelUI(panel)
 		y = y - 50
 	end
 
+	root:SetHeight(-y + 24)
+
 	panel:SetScript("OnShow", function(self)
 		_G.BetterUIDB = _G.BetterUIDB or {}
 		for i = 1, #self._buiChecks do
@@ -360,6 +426,10 @@ local function BuildPanelUI(panel)
 		if self._buiActionBarMacroTextEdit then
 			local db = _G.BetterUIDB or {}
 			self._buiActionBarMacroTextEdit:SetText(db.hideActionBarMacroText or "")
+		end
+		if self._buiActionBarClickThroughEdit then
+			local db = _G.BetterUIDB or {}
+			self._buiActionBarClickThroughEdit:SetText(db.clickThroughActionBars or "")
 		end
 		RefreshPerfEnabledState()
 	end)

@@ -31,6 +31,7 @@ local defaults = {
 
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",
+	clickThroughActionBars = "",
 
 	enableCharSecondaryStatRatings = true,
 }
@@ -94,5 +95,6 @@ function NS.ApplySettings()
 	ApplyFeature("Performance", db.enablePerformanceMonitor)
 	ApplyFeature("ActionBarBorders", true)
 	ApplyFeature("ActionBarMacroText", true)
+	ApplyFeature("ActionBarClickThrough", true)
 	ApplyFeature("CharSecondaryStatRatings", db.enableCharSecondaryStatRatings)
 end
