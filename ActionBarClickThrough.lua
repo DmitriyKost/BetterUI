@@ -1,43 +1,74 @@
--- Make action buttons on specific bars clickthrough (disable mouse interaction).
+-- Make action buttons on specific bars clickthrough.
 -- User enters IDs like: 1,7,8
--- 1 = main action bar (ActionButton1..12)
--- 2..8 = Edit Mode action bars by systemIndex (MultiBar*)
+-- 1 = main action bar
+-- 2..8 = Edit Mode action bars by systemIndex
 
 local ADDON_NAME, NS = ...
+
 NS.Features = NS.Features or {}
 NS.Features.ActionBarClickThrough = NS.Features.ActionBarClickThrough or {}
+
 local Feature = NS.Features.ActionBarClickThrough
 
 Feature._saved = Feature._saved or {}
+Feature._pendingApply = false
 
 local function ParseIDs(str)
 	local out = {}
+
 	if not str or str == "" then
 		return out
 	end
+
 	for n in tostring(str):gmatch("%d+") do
 		local id = tonumber(n)
 		if id and id >= 1 and id <= 12 then
 			out[id] = true
 		end
 	end
+
 	return out
+end
+
+local function MarkPending()
+	Feature._pendingApply = true
+end
+
+local function SafeEnableMouse(btn, enabled)
+	if not btn or not btn.EnableMouse then
+		return false
+	end
+
+	if InCombatLockdown() then
+		MarkPending()
+		return false
+	end
+
+	btn:EnableMouse(enabled and true or false)
+	return true
 end
 
 local function SaveAndSetMouseEnabled(btn, enabled, saved)
 	if not btn or not btn.EnableMouse then
 		return
 	end
+
 	if saved[btn] == nil then
 		saved[btn] = btn:IsMouseEnabled() and true or false
 	end
-	btn:EnableMouse(enabled and true or false)
+
+	SafeEnableMouse(btn, enabled)
 end
 
 local function RestoreAll(saved)
+	if InCombatLockdown() then
+		MarkPending()
+		return
+	end
+
 	for btn, wasEnabled in pairs(saved) do
 		if btn and btn.EnableMouse then
-			btn:EnableMouse(wasEnabled and true or false)
+			SafeEnableMouse(btn, wasEnabled and true or false)
 		end
 		saved[btn] = nil
 	end
@@ -47,6 +78,7 @@ local function ApplyToButton(btn, saved)
 	if not btn then
 		return
 	end
+
 	SaveAndSetMouseEnabled(btn, false, saved)
 end
 
@@ -72,25 +104,30 @@ local function EnumerateCandidateBars()
 		"MultiBar7",
 		"MultiBar8",
 	}
+
 	local out = {}
+
 	for i = 1, #names do
 		local f = _G[names[i]]
 		if f then
 			out[#out + 1] = f
 		end
 	end
+
 	return out
 end
 
 local function FindBarsBySystemIndex(targetIndex)
 	local bars = EnumerateCandidateBars()
 	local out = {}
+
 	for i = 1, #bars do
 		local b = bars[i]
 		if b.systemIndex == targetIndex then
 			out[#out + 1] = b
 		end
 	end
+
 	return out
 end
 
@@ -124,10 +161,18 @@ local function ApplyToBar(bar, saved)
 end
 
 function Feature:Apply()
+	if InCombatLockdown() then
+		self._pendingApply = true
+		return
+	end
+
+	self._pendingApply = false
+
 	local db = _G.BetterUIDB or NS.DB or {}
 	local ids = ParseIDs(db.clickThroughActionBars)
 
 	RestoreAll(self._saved)
+
 	if not next(ids) then
 		return
 	end
@@ -154,22 +199,56 @@ function Feature:Disable()
 	RestoreAll(self._saved)
 end
 
+local applyScheduled = false
+
+local function ScheduleApply(delay)
+	if applyScheduled then
+		return
+	end
+
+	applyScheduled = true
+
+	C_Timer.After(delay or 0.3, function()
+		applyScheduled = false
+
+		if Feature and Feature.Apply then
+			Feature:Apply()
+		end
+	end)
+end
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
 f:RegisterEvent("UI_SCALE_CHANGED")
 f:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 f:RegisterEvent("UPDATE_BINDINGS")
-f:SetScript("OnEvent", function()
-	C_Timer.After(0.3, function()
-		if Feature and Feature.Apply then
-			Feature:Apply()
+f:RegisterEvent("PLAYER_REGEN_ENABLED")
+
+f:SetScript("OnEvent", function(_, event)
+	if event == "PLAYER_REGEN_ENABLED" then
+		if Feature._pendingApply then
+			Feature._pendingApply = false
+			ScheduleApply(0.1)
 		end
-	end)
+		return
+	end
+
+	if InCombatLockdown() then
+		Feature._pendingApply = true
+		return
+	end
+
+	ScheduleApply(0.3)
 end)
 
 if NS.OnSettingChanged then
 	NS.OnSettingChanged(function()
+		if InCombatLockdown() then
+			Feature._pendingApply = true
+			return
+		end
+
 		Feature:Apply()
 	end)
 end
