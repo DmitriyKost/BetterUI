@@ -2,7 +2,7 @@
 ## Title: Better UI
 ## Notes: Provides some QoL tweaks for default UI.
 ## Author: DmitriyKost
-## Version: 1.1
+## Version: 1.1.1
 ## IconTexture: Interface\AddOns\BetterUI\Keg_Icon
 ## SavedVariables: BetterUIDB
 
