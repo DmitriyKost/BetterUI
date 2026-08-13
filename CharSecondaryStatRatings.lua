@@ -15,8 +15,26 @@ local function IsInCombat()
 	return InCombatLockdown and InCombatLockdown()
 end
 
+local function GetAccessibleValue(value)
+	if scrubsecretvalues then
+		return scrubsecretvalues(value)
+	end
+
+	return value
+end
+
+local function RefreshStats()
+	if not FEAT._enabled or IsInCombat() then
+		return
+	end
+
+	if CharacterStatsPane and CharacterStatsPane:IsShown() and PaperDollFrame_UpdateStats then
+		PaperDollFrame_UpdateStats()
+	end
+end
+
 local function QueueRefresh()
-	if not FEAT._enabled then
+	if not FEAT._enabled or not IsInCombat() then
 		return
 	end
 
@@ -28,6 +46,7 @@ EventFrame:SetScript("OnEvent", function(self, event)
 	if event == "PLAYER_REGEN_ENABLED" then
 		self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 		FEAT._pendingRefresh = false
+		RefreshStats()
 	end
 end)
 
@@ -48,7 +67,7 @@ local function GetStatTextFontString(statFrame)
 end
 
 local function FormatPercent(value)
-	value = tonumber(value)
+	value = tonumber(GetAccessibleValue(value))
 	if not value then
 		return nil
 	end
@@ -73,41 +92,46 @@ local function AppendRating(statFrame, rating)
 
 	local percentText = FormatPercent(statFrame and statFrame.numericValue)
 	if not percentText then
+		QueueRefresh()
 		return
 	end
 
-	local ratingValue = tonumber(rating) or 0
+	local ratingValue = tonumber(GetAccessibleValue(rating))
+	if not ratingValue then
+		QueueRefresh()
+		return
+	end
 
-	pcall(fs.SetText, fs, ("%s (%d)"):format(percentText, ratingValue))
+	fs:SetText(("%s (%d)"):format(percentText, ratingValue))
 end
 
 local STAT_HOOKS = {
 	CRITCHANCE = function()
-		return GetCombatRating(CR_CRIT_MELEE) or 0
+		return GetCombatRating(CR_CRIT_MELEE)
 	end,
 
 	HASTE = function()
-		return GetCombatRating(CR_HASTE_MELEE) or 0
+		return GetCombatRating(CR_HASTE_MELEE)
 	end,
 
 	MASTERY = function()
-		return GetCombatRating(CR_MASTERY) or 0
+		return GetCombatRating(CR_MASTERY)
 	end,
 
 	VERSATILITY = function()
-		return GetCombatRating(CR_VERSATILITY_DAMAGE_DONE) or 0
+		return GetCombatRating(CR_VERSATILITY_DAMAGE_DONE)
 	end,
 
 	LIFESTEAL = function()
-		return GetCombatRating(CR_LIFESTEAL) or 0
+		return GetCombatRating(CR_LIFESTEAL)
 	end,
 
 	AVOIDANCE = function()
-		return GetCombatRating(CR_AVOIDANCE) or 0
+		return GetCombatRating(CR_AVOIDANCE)
 	end,
 
 	SPEED = function()
-		return GetCombatRating(CR_SPEED) or 0
+		return GetCombatRating(CR_SPEED)
 	end,
 }
 
