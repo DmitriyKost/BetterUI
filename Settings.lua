@@ -347,35 +347,6 @@ local function BuildPanelUI(panel)
 	do
 		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		header:SetPoint("TOPLEFT", 16, y)
-		header:SetText("Tooltip Details")
-		y = y - 22
-
-		local description = root:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		description:SetPoint("TOPLEFT", 16, y)
-		description:SetText("Choose which technical IDs are always added to tooltips.")
-		y = y - 28
-
-		local options = {
-			{ label = "Show item IDs", tooltip = "Add item IDs to item tooltips.", key = "tooltipShowItemID" },
-			{ label = "Show spell IDs", tooltip = "Add spell IDs to spell tooltips.", key = "tooltipShowSpellID" },
-			{ label = "Show NPC IDs", tooltip = "Add NPC IDs to creature tooltips.", key = "tooltipShowNPCID" },
-			{ label = "Show enchant IDs", tooltip = "Add applied enchant IDs to item tooltips.", key = "tooltipShowEnchantID" },
-			{ label = "Show gem IDs", tooltip = "Add inserted gem IDs to item tooltips.", key = "tooltipShowGemIDs" },
-		}
-
-		for i = 1, #options do
-			local option = options[i]
-			local cb = CreateCheckbox(root, option.label, option.tooltip, option.key, y)
-			panel._buiChecks[#panel._buiChecks + 1] = cb
-			y = y - 28
-		end
-
-		y = y - 12
-	end
-
-	do
-		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		header:SetPoint("TOPLEFT", 16, y)
 		header:SetText("Action Bar Control Center")
 		y = y - 22
 

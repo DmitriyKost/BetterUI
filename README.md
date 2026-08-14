@@ -81,12 +81,6 @@ All merchant actions are disabled by default.
 
 ---
 
-## Tooltip Details
-
-Optional flags add item, spell, NPC, enchant, and gem IDs to Blizzard tooltips. Each detail type can be enabled independently.
-
----
-
 ## Action Bar Tweaks
 
 The Action Bar Control Center provides per-bar checkboxes for Action Bars 1-8. Each bar can be configured independently without entering action bar IDs manually.

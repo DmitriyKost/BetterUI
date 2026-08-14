@@ -18,4 +18,3 @@ CharSecondaryStatRatings.lua
 CharacterEquipmentAudit.lua
 ActionBarClickThrough.lua
 MerchantAssistant.lua
-TooltipDetails.lua
