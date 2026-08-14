@@ -63,27 +63,21 @@ Optional movable on-screen performance text showing:
 
 ## Action Bar Tweaks
 
+The Action Bar Control Center provides per-bar checkboxes for Action Bars 1-8. Each bar can be configured independently without entering action bar IDs manually.
+
 ### Hide Action Bar Borders
 
-Hide button borders on specific action bars.
-
-Example configuration:
-
-```
-1,7,8
-```
+Hide button borders on selected action bars.
 
 ---
 
 ### Hide Macro Text
 
-Hide macro labels on specific action bars.
+Hide macro labels on selected action bars.
 
-Example configuration:
+### Click-Through Action Bars
 
-```
-1,7,8
-```
+Prevent selected action bars from receiving mouse clicks while keeping their keybinds functional.
 
 ---
 

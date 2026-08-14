@@ -89,6 +89,64 @@ local function SetSliderEnabled(slider, enabled)
 	end
 end
 
+local function ParseActionBarIDs(value)
+	local ids = {}
+	for id in tostring(value or ""):gmatch("%d+") do
+		id = tonumber(id)
+		if id and id >= 1 and id <= 12 then
+			ids[id] = true
+		end
+	end
+	return ids
+end
+
+local function SerializeActionBarIDs(ids)
+	local values = {}
+	for id = 1, 12 do
+		if ids[id] then
+			values[#values + 1] = id
+		end
+	end
+	return table.concat(values, ",")
+end
+
+local function CreateActionBarCheckbox(parent, key, barID, x, y, tooltip)
+	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+	cb:SetPoint("TOPLEFT", x, y)
+	cb._key = key
+	cb._barID = barID
+	cb.tooltipText = tooltip
+
+	local db = _G.BetterUIDB or NS.DB or {}
+	cb:SetChecked(ParseActionBarIDs(db[key])[barID] and true or false)
+
+	cb:SetScript("OnClick", function(self)
+		_G.BetterUIDB = _G.BetterUIDB or {}
+		local ids = ParseActionBarIDs(_G.BetterUIDB[self._key])
+		ids[self._barID] = self:GetChecked() and true or nil
+		_G.BetterUIDB[self._key] = SerializeActionBarIDs(ids)
+		NS.DB = _G.BetterUIDB
+
+		if NS.ApplySettings then
+			NS.ApplySettings()
+		end
+		if NS.FireSettingChanged then
+			NS.FireSettingChanged()
+		end
+	end)
+
+	cb:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.tooltipText)
+		GameTooltip:Show()
+	end)
+	cb:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	return cb
+end
+
 local function CreateScrollableContent(panel)
 	local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
 	scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -8)
@@ -123,6 +181,7 @@ local function BuildPanelUI(panel)
 
 	local y = -60
 	panel._buiChecks = {}
+	panel._buiActionBarChecks = {}
 
 	do
 		local bHdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -165,128 +224,73 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		label:SetPoint("TOPLEFT", 16, y)
-		label:SetText("Hide ActionBar borders (IDs, e.g. 1,7,8)")
+		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		header:SetPoint("TOPLEFT", 16, y)
+		header:SetText("Action Bar Control Center")
 		y = y - 22
 
-		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
-		edit:SetSize(220, 20)
-		edit:SetAutoFocus(false)
-		edit:SetPoint("TOPLEFT", 16, y)
-		edit:SetMaxLetters(64)
+		local description = root:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		description:SetPoint("TOPLEFT", 16, y)
+		description:SetText("Choose which adjustments apply to each Blizzard action bar.")
+		y = y - 30
 
-		local function Save()
-			_G.BetterUIDB = _G.BetterUIDB or {}
-			_G.BetterUIDB.hideActionBarBorders = (edit:GetText() or ""):gsub("%s+", "")
-			NS.DB = _G.BetterUIDB
-			if NS.ApplySettings then
-				NS.ApplySettings()
+		local barHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		barHeader:SetPoint("TOPLEFT", 24, y)
+		barHeader:SetText("Action bar")
+
+		local borderHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		borderHeader:SetPoint("TOPLEFT", 190, y)
+		borderHeader:SetText("Hide border")
+
+		local macroHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		macroHeader:SetPoint("TOPLEFT", 292, y)
+		macroHeader:SetText("Hide macro")
+
+		local clickHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		clickHeader:SetPoint("TOPLEFT", 394, y)
+		clickHeader:SetText("Click-through")
+		y = y - 24
+
+		local columns = {
+			{
+				key = "hideActionBarBorders",
+				x = 210,
+				tooltip = "Hide the decorative border around buttons on Action Bar %d.",
+			},
+			{
+				key = "hideActionBarMacroText",
+				x = 310,
+				tooltip = "Hide macro names on Action Bar %d.",
+			},
+			{
+				key = "clickThroughActionBars",
+				x = 420,
+				tooltip = "Prevent mouse clicks from activating buttons on Action Bar %d. Keybinds still work.",
+			},
+		}
+
+		for barID = 1, 8 do
+			local label = root:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			label:SetPoint("TOPLEFT", 24, y - 5)
+			label:SetText(barID == 1 and "Action Bar 1 (Main)" or ("Action Bar %d"):format(barID))
+
+			for column = 1, #columns do
+				local option = columns[column]
+				local cb = CreateActionBarCheckbox(
+					root,
+					option.key,
+					barID,
+					option.x,
+					y,
+					option.tooltip:format(barID)
+				)
+				panel._buiActionBarChecks[#panel._buiActionBarChecks + 1] = cb
 			end
-			if NS.FireSettingChanged then
-				NS.FireSettingChanged()
-			end
+
+			y = y - 28
 		end
 
-		edit:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			Save()
-		end)
-
-		edit:SetScript("OnEditFocusLost", function()
-			Save()
-		end)
-
-		edit:SetScript("OnEscapePressed", function(self)
-			local db = _G.BetterUIDB or NS.DB or {}
-			self:SetText(db.hideActionBarBorders or "")
-			self:ClearFocus()
-		end)
-
-		panel._buiActionBarBorderEdit = edit
-		y = y - 40
-	end
-
-	do
-		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		label:SetPoint("TOPLEFT", 16, y)
-		label:SetText("Hide ActionBar macro text (IDs, e.g. 1,7,8)")
-		y = y - 22
-
-		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
-		edit:SetSize(220, 20)
-		edit:SetAutoFocus(false)
-		edit:SetPoint("TOPLEFT", 16, y)
-		edit:SetMaxLetters(64)
-
-		local function Save()
-			_G.BetterUIDB = _G.BetterUIDB or {}
-			_G.BetterUIDB.hideActionBarMacroText = (edit:GetText() or ""):gsub("%s+", "")
-			NS.DB = _G.BetterUIDB
-
-			if NS.ApplySettings then
-				NS.ApplySettings()
-			end
-			if NS.FireSettingChanged then
-				NS.FireSettingChanged()
-			end
-		end
-
-		edit:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			Save()
-		end)
-		edit:SetScript("OnEditFocusLost", Save)
-
-		edit:SetScript("OnEscapePressed", function(self)
-			local db = _G.BetterUIDB or NS.DB or {}
-			self:SetText(db.hideActionBarMacroText or "")
-			self:ClearFocus()
-		end)
-
-		panel._buiActionBarMacroTextEdit = edit
-		y = y - 40
-	end
-
-	do
-		local label = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		label:SetPoint("TOPLEFT", 16, y)
-		label:SetText("Make ActionBars clickthrough (IDs, e.g. 1,7,8)")
-		y = y - 22
-
-		local edit = CreateFrame("EditBox", nil, root, "InputBoxTemplate")
-		edit:SetSize(220, 20)
-		edit:SetAutoFocus(false)
-		edit:SetPoint("TOPLEFT", 16, y)
-		edit:SetMaxLetters(64)
-
-		local function Save()
-			_G.BetterUIDB = _G.BetterUIDB or {}
-			_G.BetterUIDB.clickThroughActionBars = (edit:GetText() or ""):gsub("%s+", "")
-			NS.DB = _G.BetterUIDB
-
-			if NS.ApplySettings then
-				NS.ApplySettings()
-			end
-			if NS.FireSettingChanged then
-				NS.FireSettingChanged()
-			end
-		end
-
-		edit:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			Save()
-		end)
-		edit:SetScript("OnEditFocusLost", Save)
-
-		edit:SetScript("OnEscapePressed", function(self)
-			local db = _G.BetterUIDB or NS.DB or {}
-			self:SetText(db.clickThroughActionBars or "")
-			self:ClearFocus()
-		end)
-
-		panel._buiActionBarClickThroughEdit = edit
-		y = y - 40
+		y = y - 16
 	end
 
 	local hdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -419,17 +423,10 @@ local function BuildPanelUI(panel)
 			self._buiPerfFontSlider:SetValue(v)
 			self._buiPerfFontSlider.Text:SetText(("Performance font size: %d"):format(v))
 		end
-		if self._buiActionBarBorderEdit then
-			local db = _G.BetterUIDB or {}
-			self._buiActionBarBorderEdit:SetText(db.hideActionBarBorders or "")
-		end
-		if self._buiActionBarMacroTextEdit then
-			local db = _G.BetterUIDB or {}
-			self._buiActionBarMacroTextEdit:SetText(db.hideActionBarMacroText or "")
-		end
-		if self._buiActionBarClickThroughEdit then
-			local db = _G.BetterUIDB or {}
-			self._buiActionBarClickThroughEdit:SetText(db.clickThroughActionBars or "")
+		for i = 1, #self._buiActionBarChecks do
+			local cb = self._buiActionBarChecks[i]
+			local ids = ParseActionBarIDs(_G.BetterUIDB[cb._key])
+			cb:SetChecked(ids[cb._barID] and true or false)
 		end
 		RefreshPerfEnabledState()
 	end)
