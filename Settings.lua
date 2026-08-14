@@ -220,6 +220,15 @@ local function BuildPanelUI(panel)
 			"enableCharSecondaryStatRatings",
 			y
 		)
+		y = y - 30
+
+		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
+			root,
+			"Enable Character equipment audit",
+			"Shows item levels, enchants, sockets, and audit warnings on character and inspect frames.",
+			"enableCharacterEquipmentAudit",
+			y
+		)
 		y = y - 40
 	end
 

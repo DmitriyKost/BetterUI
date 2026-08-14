@@ -11,6 +11,9 @@ The addon is modular, so individual features can be enabled or disabled from the
 ## Character Window Improvements
 
 * Displays secondary stat ratings alongside percentages in the character panel.
+* Displays equipped item levels directly on equipment slots.
+* Shows enchant and socket icons, and flags missing enchants and empty sockets in item tooltips.
+* Adds the same item level, enchant, and socket overlays when inspecting another player.
 
 ---
 

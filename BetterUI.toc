@@ -15,4 +15,5 @@ Performance.lua
 ActionBarBorderHider.lua
 ActionBarMacroTextHider.lua
 CharSecondaryStatRatings.lua
+CharacterEquipmentAudit.lua
 ActionBarClickThrough.lua

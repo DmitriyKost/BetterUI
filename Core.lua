@@ -34,6 +34,7 @@ local defaults = {
 	clickThroughActionBars = "",
 
 	enableCharSecondaryStatRatings = true,
+	enableCharacterEquipmentAudit = true,
 }
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
@@ -97,4 +98,5 @@ function NS.ApplySettings()
 	ApplyFeature("ActionBarMacroText", true)
 	ApplyFeature("ActionBarClickThrough", true)
 	ApplyFeature("CharSecondaryStatRatings", db.enableCharSecondaryStatRatings)
+	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
 end
