@@ -22,10 +22,8 @@ function Perf:HasAnyMetricEnabled(db)
 end
 
 function Perf:ComputeInterval(db)
-	if db.perfShowFPS then
-		return 0.5
-	end
-	return 0.75
+	local interval = tonumber(db.perfUpdateInterval) or 0.5
+	return math.max(0.25, math.min(2, interval))
 end
 
 function Perf:SizeToText()
@@ -33,7 +31,8 @@ function Perf:SizeToText()
 		return
 	end
 	local w = self.frame.text:GetStringWidth() or 220
-	self.frame:SetSize(math.max(60, w + 6), 18)
+	local h = self.frame.text:GetStringHeight() or 18
+	self.frame:SetSize(math.max(60, w + 6), math.max(18, h + 4))
 end
 
 function Perf:CreateFrame()
@@ -60,6 +59,7 @@ function Perf:CreateFrame()
 	local fs = f:CreateFontString(nil, "OVERLAY")
 	fs:SetPoint("LEFT", f, "LEFT", 0, 0)
 	fs:SetJustifyH("LEFT")
+	fs:SetJustifyV("MIDDLE")
 
 	local fontPath, fontSize, _ = TextStatusBarText:GetFont()
 	fs:SetFont(fontPath, fontSize, "OUTLINE")
@@ -107,6 +107,17 @@ function Perf:RestorePosition()
 	end
 end
 
+function Perf:ResetPosition()
+	local db = _G.BetterUIDB or NS.DB or {}
+	db.perfPoint = nil
+	db.perfRelPoint = nil
+	db.perfX = nil
+	db.perfY = nil
+	_G.BetterUIDB = db
+	NS.DB = db
+	self:RestorePosition()
+end
+
 function Perf:StartUpdating()
 	if not self.frame then
 		return
@@ -149,6 +160,19 @@ function Perf:ApplyFont()
 	size = math.floor(size + 0.5)
 
 	self.frame.text:SetFont(fontPath, size, "OUTLINE")
+end
+
+function Perf:ApplyColor()
+	if not self.frame or not self.frame.text then
+		return
+	end
+
+	local db = _G.BetterUIDB or NS.DB or {}
+	if db.perfUseClassColor then
+		self.frame.text:SetTextColor(self._classR or 1, self._classG or 1, self._classB or 1)
+	else
+		self.frame.text:SetTextColor(1, 1, 1)
+	end
 end
 
 function Perf:ApplyLock()
@@ -203,15 +227,11 @@ function Perf:UpdateText()
 	end
 
 	local parts = self:BuildParts(self._parts, db)
-	local text = concat(parts, "  |  ")
+	local text = concat(parts, db.perfVertical and "\n" or "  |  ")
 
 	if text ~= self._lastText then
 		self._lastText = text
 		self.frame.text:SetText(text)
-
-		if self._classR then
-			self.frame.text:SetTextColor(self._classR, self._classG, self._classB)
-		end
 
 		self:SizeToText()
 	end
@@ -231,9 +251,11 @@ function Perf:ApplyFromDB()
 
 	self.frame:Show()
 	self:ApplyFont()
+	self:ApplyColor()
 	self:ApplyLock()
 
 	self:UpdateText()
+	self:SizeToText()
 
 	if not self:HasAnyMetricEnabled(db) then
 		self:StopUpdating()

@@ -62,6 +62,10 @@ Optional movable on-screen performance text showing:
 * FPS
 * Home latency
 * World latency
+* Horizontal or stacked layout
+* Class-colored or white text
+* Configurable font size and refresh interval
+* Position reset from settings
 
 ---
 

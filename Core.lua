@@ -28,6 +28,9 @@ local defaults = {
 
 	perfLocked = false,
 	perfFontSize = 12,
+	perfUseClassColor = true,
+	perfVertical = false,
+	perfUpdateInterval = 0.5,
 
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",

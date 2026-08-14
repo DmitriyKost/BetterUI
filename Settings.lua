@@ -379,7 +379,13 @@ local function BuildPanelUI(panel)
 		SetCheckboxEnabled(panel._buiPerfShowHome, enabled)
 		SetCheckboxEnabled(panel._buiPerfShowWorld, enabled)
 		SetCheckboxEnabled(panel._buiPerfLocked, enabled)
+		SetCheckboxEnabled(panel._buiPerfUseClassColor, enabled)
+		SetCheckboxEnabled(panel._buiPerfVertical, enabled)
 		SetSliderEnabled(panel._buiPerfFontSlider, enabled)
+		SetSliderEnabled(panel._buiPerfIntervalSlider, enabled)
+		if panel._buiPerfResetButton then
+			panel._buiPerfResetButton:SetEnabled(enabled)
+		end
 	end
 
 	panel._buiPerfHeader = hdr
@@ -418,6 +424,21 @@ local function BuildPanelUI(panel)
 		y
 	)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfLocked
+	y = y - 30
+
+	panel._buiPerfUseClassColor =
+		CreateCheckbox(root, "Use class color", "Color performance text using your class color.", "perfUseClassColor", y)
+	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfUseClassColor
+	y = y - 30
+
+	panel._buiPerfVertical = CreateCheckbox(
+		root,
+		"Stack metrics vertically",
+		"Display each enabled metric on a separate line.",
+		"perfVertical",
+		y
+	)
+	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfVertical
 	y = y - 50
 
 	do
@@ -475,6 +496,71 @@ local function BuildPanelUI(panel)
 		y = y - 50
 	end
 
+	do
+		local slider = CreateFrame("Slider", nil, root, "OptionsSliderTemplate")
+		slider:SetPoint("TOPLEFT", 16, y)
+		slider:SetMinMaxValues(0.25, 2)
+		slider:SetValueStep(0.25)
+		slider:SetObeyStepOnDrag(true)
+		slider:SetWidth(240)
+
+		slider._key = "perfUpdateInterval"
+		panel._buiPerfIntervalSlider = slider
+
+		slider.Low:SetText("0.25s")
+		slider.High:SetText("2s")
+
+		local function SetLabel(value)
+			value = math.floor((tonumber(value) or 0.5) * 4 + 0.5) / 4
+			local text = value == math.floor(value) and ("%ds"):format(value) or (("%.2fs"):format(value):gsub("0s$", "s"))
+			slider.Text:SetText("Refresh interval: " .. text)
+		end
+
+		slider:SetScript("OnValueChanged", function(self, value)
+			value = math.floor((tonumber(value) or 0.5) * 4 + 0.5) / 4
+			_G.BetterUIDB = _G.BetterUIDB or {}
+			_G.BetterUIDB[self._key] = value
+			NS.DB = _G.BetterUIDB
+			SetLabel(value)
+
+			if NS.ApplySettings then
+				NS.ApplySettings()
+			end
+			if NS.FireSettingChanged then
+				NS.FireSettingChanged()
+			end
+		end)
+
+		slider:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText("Choose how often performance values are refreshed.")
+			GameTooltip:Show()
+		end)
+		slider:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+
+		local value = tonumber((_G.BetterUIDB or {})[slider._key]) or 0.5
+		slider:SetValue(value)
+		SetLabel(value)
+		y = y - 50
+	end
+
+	do
+		local button = CreateFrame("Button", nil, root, "UIPanelButtonTemplate")
+		button:SetSize(140, 22)
+		button:SetPoint("TOPLEFT", 16, y)
+		button:SetText("Reset position")
+		button:SetScript("OnClick", function()
+			local feature = NS.Features and NS.Features.Performance
+			if feature and feature.ResetPosition then
+				feature:ResetPosition()
+			end
+		end)
+		panel._buiPerfResetButton = button
+		y = y - 40
+	end
+
 	root:SetHeight(-y + 24)
 
 	panel:SetScript("OnShow", function(self)
@@ -487,6 +573,13 @@ local function BuildPanelUI(panel)
 			local v = tonumber(_G.BetterUIDB[self._buiPerfFontSlider._key]) or 12
 			self._buiPerfFontSlider:SetValue(v)
 			self._buiPerfFontSlider.Text:SetText(("Performance font size: %d"):format(v))
+		end
+		if self._buiPerfIntervalSlider then
+			local value = tonumber(_G.BetterUIDB[self._buiPerfIntervalSlider._key]) or 0.5
+			self._buiPerfIntervalSlider:SetValue(value)
+			local text = value == math.floor(value) and ("%ds"):format(value)
+				or (("%.2fs"):format(value):gsub("0s$", "s"))
+			self._buiPerfIntervalSlider.Text:SetText("Refresh interval: " .. text)
 		end
 		for i = 1, #self._buiActionBarChecks do
 			local cb = self._buiActionBarChecks[i]
