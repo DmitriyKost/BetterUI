@@ -35,6 +35,11 @@ local defaults = {
 
 	enableCharSecondaryStatRatings = true,
 	enableCharacterEquipmentAudit = true,
+	equipmentAuditShowItemLevels = true,
+	equipmentAuditShowEnchants = true,
+	equipmentAuditShowSockets = true,
+	equipmentAuditShowCharacterFrame = true,
+	equipmentAuditShowInspectFrame = true,
 }
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")

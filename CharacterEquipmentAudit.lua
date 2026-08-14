@@ -280,21 +280,32 @@ local function UpdateSlot(slot, buttonName, unit)
 		return
 	end
 
-	local itemLevel = GetDetailedItemLevel(itemLink)
-	button._buiAuditLevel:SetText(itemLevel or "")
-	button._buiAuditLevel:SetShown(itemLevel ~= nil)
-
-	local messages = {}
-	local hasEnchant = HasEnchant(itemLink)
-	button._buiAuditEnchant:SetShown(hasEnchant)
-	button._buiAuditEnchantBorder:SetShown(hasEnchant)
-	button._buiAuditEnchantBackground:SetShown(hasEnchant)
-
-	if CanEnchant(slot.id, itemLink) and not hasEnchant then
-		messages[#messages + 1] = "Missing enchant"
+	local db = _G.BetterUIDB or NS.DB or {}
+	if db.equipmentAuditShowItemLevels then
+		local itemLevel = GetDetailedItemLevel(itemLink)
+		button._buiAuditLevel:SetText(itemLevel or "")
+		button._buiAuditLevel:SetShown(itemLevel ~= nil)
+	else
+		button._buiAuditLevel:Hide()
 	end
 
-	local socketTypes = GetSocketTypes(itemLink)
+	local messages = {}
+	if db.equipmentAuditShowEnchants then
+		local hasEnchant = HasEnchant(itemLink)
+		button._buiAuditEnchant:SetShown(hasEnchant)
+		button._buiAuditEnchantBorder:SetShown(hasEnchant)
+		button._buiAuditEnchantBackground:SetShown(hasEnchant)
+
+		if CanEnchant(slot.id, itemLink) and not hasEnchant then
+			messages[#messages + 1] = "Missing enchant"
+		end
+	else
+		button._buiAuditEnchant:Hide()
+		button._buiAuditEnchantBorder:Hide()
+		button._buiAuditEnchantBackground:Hide()
+	end
+
+	local socketTypes = db.equipmentAuditShowSockets and GetSocketTypes(itemLink) or {}
 	local emptySockets = 0
 	for index = 1, #socketTypes do
 		local socket = button._buiAuditSockets[index]
@@ -353,16 +364,21 @@ function Feature:Refresh()
 		return
 	end
 	self._pendingRefresh = false
-	if CharacterFrame and CharacterFrame:IsShown() then
+	local db = _G.BetterUIDB or NS.DB or {}
+	if db.equipmentAuditShowCharacterFrame and CharacterFrame and CharacterFrame:IsShown() then
 		UpdateEquipment("player", false)
+	else
+		HideEquipment(false)
 	end
-	if InspectFrame and InspectFrame:IsShown() then
+	if db.equipmentAuditShowInspectFrame and InspectFrame and InspectFrame:IsShown() then
 		local unit = InspectFrame.unit or "target"
 		if UnitExists(unit) then
 			UpdateEquipment(unit, true)
 		else
 			HideEquipment(true)
 		end
+	else
+		HideEquipment(true)
 	end
 end
 

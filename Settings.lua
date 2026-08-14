@@ -1,8 +1,8 @@
 local ADDON_NAME, NS = ...
 
-local function CreateCheckbox(parent, label, tooltip, key, y)
+local function CreateCheckbox(parent, label, tooltip, key, y, x)
 	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-	cb:SetPoint("TOPLEFT", 16, y)
+	cb:SetPoint("TOPLEFT", x or 16, y)
 
 	cb._key = key
 
@@ -220,15 +220,71 @@ local function BuildPanelUI(panel)
 			"enableCharSecondaryStatRatings",
 			y
 		)
-		y = y - 30
+		y = y - 40
+	end
 
-		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
+	do
+		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		header:SetPoint("TOPLEFT", 16, y)
+		header:SetText("Equipment Audit")
+		y = y - 24
+
+		panel._buiEquipmentAuditOptions = {}
+		panel._buiEquipmentAuditEnable = CreateCheckbox(
 			root,
-			"Enable Character equipment audit",
+			"Enable equipment audit",
 			"Shows item levels, enchants, sockets, and audit warnings on character and inspect frames.",
 			"enableCharacterEquipmentAudit",
 			y
 		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiEquipmentAuditEnable
+		y = y - 30
+
+		local options = {
+			{
+				label = "Show item levels",
+				tooltip = "Show item level text on equipped items.",
+				key = "equipmentAuditShowItemLevels",
+			},
+			{
+				label = "Show enchant indicators",
+				tooltip = "Show enchant badges and missing-enchant warnings.",
+				key = "equipmentAuditShowEnchants",
+			},
+			{
+				label = "Show socket indicators",
+				tooltip = "Show gem icons and empty-socket warnings.",
+				key = "equipmentAuditShowSockets",
+			},
+			{
+				label = "Enable on Character frame",
+				tooltip = "Show equipment audit information on your character panel.",
+				key = "equipmentAuditShowCharacterFrame",
+			},
+			{
+				label = "Enable on Inspect frame",
+				tooltip = "Show equipment audit information when inspecting another player.",
+				key = "equipmentAuditShowInspectFrame",
+			},
+		}
+
+		for i = 1, #options do
+			local option = options[i]
+			local cb = CreateCheckbox(root, option.label, option.tooltip, option.key, y, 32)
+			panel._buiEquipmentAuditOptions[#panel._buiEquipmentAuditOptions + 1] = cb
+			panel._buiChecks[#panel._buiChecks + 1] = cb
+			y = y - 28
+		end
+
+		panel._buiRefreshEquipmentAuditEnabledState = function()
+			local enabled = _G.BetterUIDB and _G.BetterUIDB.enableCharacterEquipmentAudit and true or false
+			for i = 1, #panel._buiEquipmentAuditOptions do
+				SetCheckboxEnabled(panel._buiEquipmentAuditOptions[i], enabled)
+			end
+		end
+
+		panel._buiEquipmentAuditEnable:HookScript("OnClick", panel._buiRefreshEquipmentAuditEnabledState)
+		panel._buiRefreshEquipmentAuditEnabledState()
 		y = y - 40
 	end
 
@@ -436,6 +492,9 @@ local function BuildPanelUI(panel)
 			local cb = self._buiActionBarChecks[i]
 			local ids = ParseActionBarIDs(_G.BetterUIDB[cb._key])
 			cb:SetChecked(ids[cb._barID] and true or false)
+		end
+		if self._buiRefreshEquipmentAuditEnabledState then
+			self._buiRefreshEquipmentAuditEnabledState()
 		end
 		RefreshPerfEnabledState()
 	end)
