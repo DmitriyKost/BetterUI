@@ -69,6 +69,24 @@ Optional movable on-screen performance text showing:
 
 ---
 
+## Merchant Assistant
+
+Optional merchant automation that can:
+
+* Sell poor-quality junk and report the gold earned.
+* Repair equipment and report the cost.
+* Prefer available guild repair funds before using personal money.
+
+All merchant actions are disabled by default.
+
+---
+
+## Tooltip Details
+
+Optional flags add item, spell, NPC, enchant, and gem IDs to Blizzard tooltips. Each detail type can be enabled independently.
+
+---
+
 ## Action Bar Tweaks
 
 The Action Bar Control Center provides per-bar checkboxes for Action Bars 1-8. Each bar can be configured independently without entering action bar IDs manually.

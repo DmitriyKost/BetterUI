@@ -291,6 +291,91 @@ local function BuildPanelUI(panel)
 	do
 		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		header:SetPoint("TOPLEFT", 16, y)
+		header:SetText("Merchant Assistant")
+		y = y - 24
+
+		panel._buiMerchantEnable = CreateCheckbox(
+			root,
+			"Enable Merchant Assistant",
+			"Run selected selling and repair actions when a merchant opens.",
+			"enableMerchantAssistant",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMerchantEnable
+		y = y - 30
+
+		panel._buiMerchantSellJunk =
+			CreateCheckbox(root, "Automatically sell junk", "Sell all poor-quality items.", "merchantSellJunk", y, 32)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMerchantSellJunk
+		y = y - 28
+
+		panel._buiMerchantAutoRepair = CreateCheckbox(
+			root,
+			"Automatically repair equipment",
+			"Repair all damaged equipment when possible.",
+			"merchantAutoRepair",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMerchantAutoRepair
+		y = y - 28
+
+		panel._buiMerchantGuildRepair = CreateCheckbox(
+			root,
+			"Prefer guild repair funds",
+			"Use available guild repair funds before personal money.",
+			"merchantUseGuildRepair",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMerchantGuildRepair
+
+		panel._buiRefreshMerchantEnabledState = function()
+			local db = _G.BetterUIDB or {}
+			local enabled = db.enableMerchantAssistant and true or false
+			SetCheckboxEnabled(panel._buiMerchantSellJunk, enabled)
+			SetCheckboxEnabled(panel._buiMerchantAutoRepair, enabled)
+			SetCheckboxEnabled(panel._buiMerchantGuildRepair, enabled and db.merchantAutoRepair and true or false)
+		end
+
+		panel._buiMerchantEnable:HookScript("OnClick", panel._buiRefreshMerchantEnabledState)
+		panel._buiMerchantAutoRepair:HookScript("OnClick", panel._buiRefreshMerchantEnabledState)
+		panel._buiRefreshMerchantEnabledState()
+		y = y - 40
+	end
+
+	do
+		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		header:SetPoint("TOPLEFT", 16, y)
+		header:SetText("Tooltip Details")
+		y = y - 22
+
+		local description = root:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		description:SetPoint("TOPLEFT", 16, y)
+		description:SetText("Choose which technical IDs are always added to tooltips.")
+		y = y - 28
+
+		local options = {
+			{ label = "Show item IDs", tooltip = "Add item IDs to item tooltips.", key = "tooltipShowItemID" },
+			{ label = "Show spell IDs", tooltip = "Add spell IDs to spell tooltips.", key = "tooltipShowSpellID" },
+			{ label = "Show NPC IDs", tooltip = "Add NPC IDs to creature tooltips.", key = "tooltipShowNPCID" },
+			{ label = "Show enchant IDs", tooltip = "Add applied enchant IDs to item tooltips.", key = "tooltipShowEnchantID" },
+			{ label = "Show gem IDs", tooltip = "Add inserted gem IDs to item tooltips.", key = "tooltipShowGemIDs" },
+		}
+
+		for i = 1, #options do
+			local option = options[i]
+			local cb = CreateCheckbox(root, option.label, option.tooltip, option.key, y)
+			panel._buiChecks[#panel._buiChecks + 1] = cb
+			y = y - 28
+		end
+
+		y = y - 12
+	end
+
+	do
+		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		header:SetPoint("TOPLEFT", 16, y)
 		header:SetText("Action Bar Control Center")
 		y = y - 22
 
@@ -588,6 +673,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshEquipmentAuditEnabledState then
 			self._buiRefreshEquipmentAuditEnabledState()
+		end
+		if self._buiRefreshMerchantEnabledState then
+			self._buiRefreshMerchantEnabledState()
 		end
 		RefreshPerfEnabledState()
 	end)

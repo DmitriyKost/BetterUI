@@ -32,6 +32,17 @@ local defaults = {
 	perfVertical = false,
 	perfUpdateInterval = 0.5,
 
+	enableMerchantAssistant = false,
+	merchantSellJunk = false,
+	merchantAutoRepair = false,
+	merchantUseGuildRepair = true,
+
+	tooltipShowItemID = false,
+	tooltipShowSpellID = false,
+	tooltipShowNPCID = false,
+	tooltipShowEnchantID = false,
+	tooltipShowGemIDs = false,
+
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",
 	clickThroughActionBars = "",
@@ -107,4 +118,6 @@ function NS.ApplySettings()
 	ApplyFeature("ActionBarClickThrough", true)
 	ApplyFeature("CharSecondaryStatRatings", db.enableCharSecondaryStatRatings)
 	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
+	ApplyFeature("MerchantAssistant", true)
+	ApplyFeature("TooltipDetails", true)
 end
