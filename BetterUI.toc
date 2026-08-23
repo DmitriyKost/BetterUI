@@ -19,3 +19,4 @@ CharacterEquipmentAudit.lua
 ActionBarClickThrough.lua
 MerchantAssistant.lua
 MythicPlusTweaks.lua
+ModernChat.lua

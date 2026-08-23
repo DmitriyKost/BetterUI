@@ -39,6 +39,9 @@ local defaults = {
 	enableMythicPlusTweaks = true,
 	mythicPlusShowRunStats = true,
 	mythicPlusHighlightOwnedKeystone = true,
+	enableModernChat = true,
+	modernChatDynamicOpacity = true,
+	modernChatRelaxedSpacing = true,
 
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",
@@ -118,4 +121,5 @@ function NS.ApplySettings()
 	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
 	ApplyFeature("MerchantAssistant", true)
 	ApplyFeature("MythicPlusTweaks", db.enableMythicPlusTweaks)
+	ApplyFeature("ModernChat", db.enableModernChat)
 end

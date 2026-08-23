@@ -333,6 +333,54 @@ local function BuildPanelUI(panel)
 	end
 
 	do
+		local section = CreateCollapsibleSection(panel, root, "modernChat", "Modern Chat")
+		local content = section.Content
+		local y = -4
+
+		panel._buiModernChatEnable = CreateCheckbox(
+			content,
+			"Enable modern chat styling",
+			"Refines Blizzard chat frames and integrates the input area while preserving native behavior and Edit Mode positioning.",
+			"enableModernChat",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiModernChatEnable
+		y = y - 30
+
+		panel._buiModernChatDynamicOpacity = CreateCheckbox(
+			content,
+			"Emphasize chat on hover and focus",
+			"Increase backdrop opacity while interacting with chat, then fade it during gameplay.",
+			"modernChatDynamicOpacity",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiModernChatDynamicOpacity
+		y = y - 30
+
+		panel._buiModernChatSpacing = CreateCheckbox(
+			content,
+			"Use relaxed message spacing",
+			"Adds a small amount of space between chat lines for readability.",
+			"modernChatRelaxedSpacing",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiModernChatSpacing
+		y = y - 30
+
+		panel._buiRefreshModernChatEnabledState = function()
+			local enabled = (_G.BetterUIDB or {}).enableModernChat and true or false
+			SetCheckboxEnabled(panel._buiModernChatDynamicOpacity, enabled)
+			SetCheckboxEnabled(panel._buiModernChatSpacing, enabled)
+		end
+
+		panel._buiModernChatEnable:HookScript("OnClick", panel._buiRefreshModernChatEnabledState)
+		panel._buiRefreshModernChatEnabledState()
+		section:SetContentHeight(-y + 4)
+	end
+
+	do
 		local section = CreateCollapsibleSection(panel, root, "mythicPlus", "Mythic+")
 		local content = section.Content
 		local y = -4
@@ -814,6 +862,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshMythicPlusEnabledState then
 			self._buiRefreshMythicPlusEnabledState()
+		end
+		if self._buiRefreshModernChatEnabledState then
+			self._buiRefreshModernChatEnabledState()
 		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()
