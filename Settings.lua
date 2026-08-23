@@ -168,6 +168,96 @@ local function CreateScrollableContent(panel)
 	return content
 end
 
+local SECTION_HEADER_HEIGHT = 24
+local SECTION_CONTENT_OFFSET = 28
+local SECTION_SPACING = 8
+
+local function CreateCollapsibleSection(panel, root, key, title)
+	local section = CreateFrame("Frame", nil, root)
+	section:SetPoint("LEFT", root, "LEFT")
+	section:SetPoint("RIGHT", root, "RIGHT")
+
+	local previous = panel._buiSections[#panel._buiSections]
+	if previous then
+		section:SetPoint("TOP", previous, "BOTTOM", 0, -SECTION_SPACING)
+	else
+		section:SetPoint("TOP", root, "TOP", 0, -60)
+	end
+
+	local header = CreateFrame("Button", nil, section)
+	header:SetPoint("TOPLEFT", section, "TOPLEFT", 8, 0)
+	header:SetPoint("TOPRIGHT", section, "TOPRIGHT", -8, 0)
+	header:SetHeight(SECTION_HEADER_HEIGHT)
+
+	local background = header:CreateTexture(nil, "BACKGROUND")
+	background:SetAllPoints()
+	background:SetColorTexture(0.08, 0.08, 0.08, 0.7)
+
+	local highlight = header:CreateTexture(nil, "HIGHLIGHT")
+	highlight:SetAllPoints()
+	highlight:SetColorTexture(1, 0.82, 0, 0.08)
+
+	local indicator = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	indicator:SetPoint("LEFT", header, "LEFT", 8, 0)
+	indicator:SetWidth(10)
+	indicator:SetJustifyH("CENTER")
+
+	local label = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	label:SetPoint("LEFT", indicator, "RIGHT", 7, 0)
+	label:SetText(title)
+
+	local content = CreateFrame("Frame", nil, section)
+	content:SetPoint("TOPLEFT", section, "TOPLEFT", 0, -SECTION_CONTENT_OFFSET)
+	content:SetPoint("TOPRIGHT", section, "TOPRIGHT", 0, -SECTION_CONTENT_OFFSET)
+
+	section.Content = content
+	section.Header = header
+	section.Label = label
+	section.Indicator = indicator
+	section.key = key
+	section.contentHeight = 0
+
+	function section:RefreshHeight()
+		local contentHeight = self.collapsed and 0 or self.contentHeight
+		self.Content:SetShown(not self.collapsed)
+		self:SetHeight(SECTION_HEADER_HEIGHT + (self.collapsed and 0 or 4 + contentHeight))
+		self.Indicator:SetText(self.collapsed and "+" or "-")
+		if panel._buiRefreshSectionLayout then
+			panel._buiRefreshSectionLayout()
+		end
+	end
+
+	function section:SetContentHeight(height)
+		self.contentHeight = math.max(0, height or 0)
+		self.Content:SetHeight(self.contentHeight)
+		self:RefreshHeight()
+	end
+
+	function section:SetCollapsed(collapsed, persist)
+		self.collapsed = collapsed and true or false
+		if persist then
+			_G.BetterUIDB = _G.BetterUIDB or {}
+			_G.BetterUIDB.settingsCollapsedSections = _G.BetterUIDB.settingsCollapsedSections or {}
+			_G.BetterUIDB.settingsCollapsedSections[self.key] = self.collapsed or nil
+			NS.DB = _G.BetterUIDB
+		end
+		self:RefreshHeight()
+	end
+
+	function section:RefreshCollapsedState()
+		local collapsed = (_G.BetterUIDB or {}).settingsCollapsedSections
+		self:SetCollapsed(type(collapsed) == "table" and collapsed[self.key] == true, false)
+	end
+
+	header:SetScript("OnClick", function()
+		section:SetCollapsed(not section.collapsed, true)
+	end)
+
+	panel._buiSections[#panel._buiSections + 1] = section
+	section:RefreshCollapsedState()
+	return section
+end
+
 local function BuildPanelUI(panel)
 	local root = CreateScrollableContent(panel)
 
@@ -179,58 +269,76 @@ local function BuildPanelUI(panel)
 	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 	sub:SetText("Quality-of-life tools and small UI enhancements.")
 
-	local y = -60
 	panel._buiChecks = {}
 	panel._buiActionBarChecks = {}
+	panel._buiSections = {}
+	panel._buiRefreshSectionLayout = function()
+		local height = 76
+		for i = 1, #panel._buiSections do
+			height = height + panel._buiSections[i]:GetHeight()
+			if i < #panel._buiSections then
+				height = height + SECTION_SPACING
+			end
+		end
+		root:SetHeight(height)
+
+		local scroll = panel._buiScrollFrame
+		if scroll then
+			scroll:UpdateScrollChildRect()
+			local maxScroll = scroll:GetVerticalScrollRange()
+			if scroll:GetVerticalScroll() > maxScroll then
+				scroll:SetVerticalScroll(maxScroll)
+			end
+		end
+	end
 
 	do
-		local bHdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		bHdr:SetPoint("TOPLEFT", 16, y)
-		bHdr:SetText("Brewmaster")
-		y = y - 24
+		local section = CreateCollapsibleSection(panel, root, "brewmaster", "Brewmaster")
+		local content = section.Content
+		local y = -4
 
 		panel._buiChecks[#panel._buiChecks + 1] =
-			CreateCheckbox(root, "Enable Stagger bar overlays", "Custom stagger text overlays.", "enableStaggerBar", y)
+			CreateCheckbox(content, "Enable Stagger bar overlays", "Custom stagger text overlays.", "enableStaggerBar", y)
 		y = y - 30
 
 		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
-			root,
+			content,
 			"Enable Black Ox statue removal buttons",
 			"Creates /click-safe destroytotem buttons.",
 			"enableStatueKill",
 			y
 		)
-		y = y - 40
+		y = y - 30
+		section:SetContentHeight(-y + 4)
 	end
 
 	do
-		local gHdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		gHdr:SetPoint("TOPLEFT", 16, y)
-		gHdr:SetText("General")
-		y = y - 24
+		local section = CreateCollapsibleSection(panel, root, "general", "General")
+		local content = section.Content
+		local y = -4
 
 		panel._buiChecks[#panel._buiChecks + 1] =
-			CreateCheckbox(root, "Enable Health bar overlays", "HP% / HP / Absorbs overlays.", "enableHealthBar", y)
+			CreateCheckbox(content, "Enable Health bar overlays", "HP% / HP / Absorbs overlays.", "enableHealthBar", y)
 		y = y - 30
 
 		panel._buiChecks[#panel._buiChecks + 1] = CreateCheckbox(
-			root,
+			content,
 			"Show secondary stat rating in Character window",
 			"Adds the numeric rating next to the % value (uses Blizzard's same font styling).",
 			"enableCharSecondaryStatRatings",
 			y
 		)
-		y = y - 40
+		y = y - 30
+		section:SetContentHeight(-y + 4)
 	end
 
 	do
-		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		header:SetPoint("TOPLEFT", 16, y)
-		header:SetText("Mythic+")
-		y = y - 24
+		local section = CreateCollapsibleSection(panel, root, "mythicPlus", "Mythic+")
+		local content = section.Content
+		local y = -4
 
 		panel._buiMythicPlusEnable = CreateCheckbox(
-			root,
+			content,
 			"Enable Mythic+ tweaks",
 			"Enhances Mythic+ dungeon icons with earned portals and optional run and keystone details.",
 			"enableMythicPlusTweaks",
@@ -240,7 +348,7 @@ local function BuildPanelUI(panel)
 		y = y - 30
 
 		panel._buiMythicPlusStats = CreateCheckbox(
-			root,
+			content,
 			"Show level / time / score on icons",
 			"Renders best run level, clear time, and dungeon score on each icon.",
 			"mythicPlusShowRunStats",
@@ -251,7 +359,7 @@ local function BuildPanelUI(panel)
 		y = y - 30
 
 		panel._buiMythicPlusKeyHighlight = CreateCheckbox(
-			root,
+			content,
 			"Highlight your owned keystone",
 			"Adds a gold border to your keystone's dungeon icon and its level to the tooltip.",
 			"mythicPlusHighlightOwnedKeystone",
@@ -269,18 +377,18 @@ local function BuildPanelUI(panel)
 
 		panel._buiMythicPlusEnable:HookScript("OnClick", panel._buiRefreshMythicPlusEnabledState)
 		panel._buiRefreshMythicPlusEnabledState()
-		y = y - 40
+		y = y - 30
+		section:SetContentHeight(-y + 4)
 	end
 
 	do
-		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		header:SetPoint("TOPLEFT", 16, y)
-		header:SetText("Equipment Audit")
-		y = y - 24
+		local section = CreateCollapsibleSection(panel, root, "equipmentAudit", "Equipment Audit")
+		local content = section.Content
+		local y = -4
 
 		panel._buiEquipmentAuditOptions = {}
 		panel._buiEquipmentAuditEnable = CreateCheckbox(
-			root,
+			content,
 			"Enable equipment audit",
 			"Shows item levels, enchants, sockets, and audit warnings on character and inspect frames.",
 			"enableCharacterEquipmentAudit",
@@ -324,7 +432,7 @@ local function BuildPanelUI(panel)
 
 		for i = 1, #options do
 			local option = options[i]
-			local cb = CreateCheckbox(root, option.label, option.tooltip, option.key, y, 32)
+			local cb = CreateCheckbox(content, option.label, option.tooltip, option.key, y, 32)
 			panel._buiEquipmentAuditOptions[#panel._buiEquipmentAuditOptions + 1] = cb
 			panel._buiChecks[#panel._buiChecks + 1] = cb
 			y = y - 28
@@ -339,17 +447,16 @@ local function BuildPanelUI(panel)
 
 		panel._buiEquipmentAuditEnable:HookScript("OnClick", panel._buiRefreshEquipmentAuditEnabledState)
 		panel._buiRefreshEquipmentAuditEnabledState()
-		y = y - 40
+		section:SetContentHeight(-y + 4)
 	end
 
 	do
-		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		header:SetPoint("TOPLEFT", 16, y)
-		header:SetText("Merchant Assistant")
-		y = y - 24
+		local section = CreateCollapsibleSection(panel, root, "merchantAssistant", "Merchant Assistant")
+		local content = section.Content
+		local y = -4
 
 		panel._buiMerchantEnable = CreateCheckbox(
-			root,
+			content,
 			"Enable Merchant Assistant",
 			"Run selected selling and repair actions when a merchant opens.",
 			"enableMerchantAssistant",
@@ -359,12 +466,12 @@ local function BuildPanelUI(panel)
 		y = y - 30
 
 		panel._buiMerchantSellJunk =
-			CreateCheckbox(root, "Automatically sell junk", "Sell all poor-quality items.", "merchantSellJunk", y, 32)
+			CreateCheckbox(content, "Automatically sell junk", "Sell all poor-quality items.", "merchantSellJunk", y, 32)
 		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMerchantSellJunk
 		y = y - 28
 
 		panel._buiMerchantAutoRepair = CreateCheckbox(
-			root,
+			content,
 			"Automatically repair equipment",
 			"Repair all damaged equipment when possible.",
 			"merchantAutoRepair",
@@ -375,7 +482,7 @@ local function BuildPanelUI(panel)
 		y = y - 28
 
 		panel._buiMerchantGuildRepair = CreateCheckbox(
-			root,
+			content,
 			"Prefer guild repair funds",
 			"Use available guild repair funds before personal money.",
 			"merchantUseGuildRepair",
@@ -395,33 +502,33 @@ local function BuildPanelUI(panel)
 		panel._buiMerchantEnable:HookScript("OnClick", panel._buiRefreshMerchantEnabledState)
 		panel._buiMerchantAutoRepair:HookScript("OnClick", panel._buiRefreshMerchantEnabledState)
 		panel._buiRefreshMerchantEnabledState()
-		y = y - 40
+		y = y - 30
+		section:SetContentHeight(-y + 4)
 	end
 
 	do
-		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		header:SetPoint("TOPLEFT", 16, y)
-		header:SetText("Action Bar Control Center")
-		y = y - 22
+		local section = CreateCollapsibleSection(panel, root, "actionBars", "Action Bar Control Center")
+		local content = section.Content
+		local y = -4
 
-		local description = root:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		local description = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		description:SetPoint("TOPLEFT", 16, y)
 		description:SetText("Choose which adjustments apply to each Blizzard action bar.")
 		y = y - 30
 
-		local barHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		local barHeader = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 		barHeader:SetPoint("TOPLEFT", 24, y)
 		barHeader:SetText("Action bar")
 
-		local borderHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		local borderHeader = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 		borderHeader:SetPoint("TOPLEFT", 190, y)
 		borderHeader:SetText("Hide border")
 
-		local macroHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		local macroHeader = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 		macroHeader:SetPoint("TOPLEFT", 292, y)
 		macroHeader:SetText("Hide macro")
 
-		local clickHeader = root:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		local clickHeader = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 		clickHeader:SetPoint("TOPLEFT", 394, y)
 		clickHeader:SetText("Click-through")
 		y = y - 24
@@ -445,14 +552,14 @@ local function BuildPanelUI(panel)
 		}
 
 		for barID = 1, 8 do
-			local label = root:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			local label = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 			label:SetPoint("TOPLEFT", 24, y - 5)
 			label:SetText(barID == 1 and "Action Bar 1 (Main)" or ("Action Bar %d"):format(barID))
 
 			for column = 1, #columns do
 				local option = columns[column]
 				local cb = CreateActionBarCheckbox(
-					root,
+					content,
 					option.key,
 					barID,
 					option.x,
@@ -465,15 +572,17 @@ local function BuildPanelUI(panel)
 			y = y - 28
 		end
 
-		y = y - 16
+		y = y - 8
+		section:SetContentHeight(-y + 4)
 	end
 
-	local hdr = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	hdr:SetPoint("TOPLEFT", 16, y)
-	hdr:SetText("Performance Monitor")
-	y = y - 24
+	do
+		local section = CreateCollapsibleSection(panel, root, "performance", "Performance Monitor")
+		local content = section.Content
+		local y = -4
+		local hdr = section.Label
 
-	local function RefreshPerfEnabledState()
+	panel._buiRefreshPerformanceEnabledState = function()
 		_G.BetterUIDB = _G.BetterUIDB or {}
 		local enabled = _G.BetterUIDB.enablePerformanceMonitor and true or false
 
@@ -501,33 +610,33 @@ local function BuildPanelUI(panel)
 	panel._buiPerfHeader = hdr
 
 	panel._buiPerfEnable = CreateCheckbox(
-		root,
+		content,
 		"Enable performance monitor text",
 		"Movable text showing FPS / H lat / W lat (toggle what to show below).",
 		"enablePerformanceMonitor",
 		y
 	)
 	panel._buiPerfEnable:HookScript("OnClick", function()
-		RefreshPerfEnabledState()
+		panel._buiRefreshPerformanceEnabledState()
 	end)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfEnable
 	y = y - 30
 
-	panel._buiPerfShowFPS = CreateCheckbox(root, "Show FPS", "Show current FPS.", "perfShowFPS", y)
+	panel._buiPerfShowFPS = CreateCheckbox(content, "Show FPS", "Show current FPS.", "perfShowFPS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowFPS
 	y = y - 30
 
-	panel._buiPerfShowHome = CreateCheckbox(root, "Show Home latency", "Show Home latency (ms).", "perfShowHomeMS", y)
+	panel._buiPerfShowHome = CreateCheckbox(content, "Show Home latency", "Show Home latency (ms).", "perfShowHomeMS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowHome
 	y = y - 30
 
 	panel._buiPerfShowWorld =
-		CreateCheckbox(root, "Show World latency", "Show World latency (ms).", "perfShowWorldMS", y)
+		CreateCheckbox(content, "Show World latency", "Show World latency (ms).", "perfShowWorldMS", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfShowWorld
 	y = y - 30
 
 	panel._buiPerfLocked = CreateCheckbox(
-		root,
+		content,
 		"Lock performance frame",
 		"Prevents dragging (disables mouse on the frame).",
 		"perfLocked",
@@ -537,12 +646,12 @@ local function BuildPanelUI(panel)
 	y = y - 30
 
 	panel._buiPerfUseClassColor =
-		CreateCheckbox(root, "Use class color", "Color performance text using your class color.", "perfUseClassColor", y)
+		CreateCheckbox(content, "Use class color", "Color performance text using your class color.", "perfUseClassColor", y)
 	panel._buiChecks[#panel._buiChecks + 1] = panel._buiPerfUseClassColor
 	y = y - 30
 
 	panel._buiPerfVertical = CreateCheckbox(
-		root,
+		content,
 		"Stack metrics vertically",
 		"Display each enabled metric on a separate line.",
 		"perfVertical",
@@ -552,7 +661,7 @@ local function BuildPanelUI(panel)
 	y = y - 50
 
 	do
-		local slider = CreateFrame("Slider", nil, root, "OptionsSliderTemplate")
+		local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
 		slider:SetPoint("TOPLEFT", 16, y)
 		slider:SetMinMaxValues(8, 24)
 		slider:SetValueStep(1)
@@ -607,7 +716,7 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local slider = CreateFrame("Slider", nil, root, "OptionsSliderTemplate")
+		local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
 		slider:SetPoint("TOPLEFT", 16, y)
 		slider:SetMinMaxValues(0.25, 2)
 		slider:SetValueStep(0.25)
@@ -657,7 +766,7 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local button = CreateFrame("Button", nil, root, "UIPanelButtonTemplate")
+		local button = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 		button:SetSize(140, 22)
 		button:SetPoint("TOPLEFT", 16, y)
 		button:SetText("Reset position")
@@ -671,10 +780,14 @@ local function BuildPanelUI(panel)
 		y = y - 40
 	end
 
-	root:SetHeight(-y + 24)
+		section:SetContentHeight(-y + 4)
+	end
 
 	panel:SetScript("OnShow", function(self)
 		_G.BetterUIDB = _G.BetterUIDB or {}
+		for i = 1, #self._buiSections do
+			self._buiSections[i]:RefreshCollapsedState()
+		end
 		for i = 1, #self._buiChecks do
 			local cb = self._buiChecks[i]
 			cb:SetChecked(_G.BetterUIDB[cb._key] and true or false)
@@ -699,10 +812,15 @@ local function BuildPanelUI(panel)
 		if self._buiRefreshEquipmentAuditEnabledState then
 			self._buiRefreshEquipmentAuditEnabledState()
 		end
+		if self._buiRefreshMythicPlusEnabledState then
+			self._buiRefreshMythicPlusEnabledState()
+		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()
 		end
-		RefreshPerfEnabledState()
+		if self._buiRefreshPerformanceEnabledState then
+			self._buiRefreshPerformanceEnabledState()
+		end
 	end)
 end
 

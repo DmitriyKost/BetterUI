@@ -142,6 +142,8 @@ or via slash command:
 /bui
 ```
 
+Settings are grouped into collapsible sections, and their expanded state is remembered between sessions.
+
 ---
 
 # License
