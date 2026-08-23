@@ -226,6 +226,55 @@ local function BuildPanelUI(panel)
 	do
 		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		header:SetPoint("TOPLEFT", 16, y)
+		header:SetText("Mythic+")
+		y = y - 24
+
+		panel._buiMythicPlusEnable = CreateCheckbox(
+			root,
+			"Enable Mythic+ tweaks",
+			"Enhances Mythic+ dungeon icons with earned portals and optional run and keystone details.",
+			"enableMythicPlusTweaks",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMythicPlusEnable
+		y = y - 30
+
+		panel._buiMythicPlusStats = CreateCheckbox(
+			root,
+			"Show level / time / score on icons",
+			"Renders best run level, clear time, and dungeon score on each icon.",
+			"mythicPlusShowRunStats",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMythicPlusStats
+		y = y - 30
+
+		panel._buiMythicPlusKeyHighlight = CreateCheckbox(
+			root,
+			"Highlight your owned keystone",
+			"Adds a gold border to your keystone's dungeon icon and its level to the tooltip.",
+			"mythicPlusHighlightOwnedKeystone",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiMythicPlusKeyHighlight
+
+		panel._buiRefreshMythicPlusEnabledState = function()
+			local db = _G.BetterUIDB or {}
+			local enabled = db.enableMythicPlusTweaks and true or false
+			SetCheckboxEnabled(panel._buiMythicPlusStats, enabled)
+			SetCheckboxEnabled(panel._buiMythicPlusKeyHighlight, enabled)
+		end
+
+		panel._buiMythicPlusEnable:HookScript("OnClick", panel._buiRefreshMythicPlusEnabledState)
+		panel._buiRefreshMythicPlusEnabledState()
+		y = y - 40
+	end
+
+	do
+		local header = root:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		header:SetPoint("TOPLEFT", 16, y)
 		header:SetText("Equipment Audit")
 		y = y - 24
 

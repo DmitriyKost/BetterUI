@@ -2,7 +2,7 @@
 ## Title: Better UI
 ## Notes: Provides some QoL tweaks for default UI.
 ## Author: DmitriyKost
-## Version: 1.2.0
+## Version: 1.3.0
 ## IconTexture: Interface\AddOns\BetterUI\Keg_Icon
 ## SavedVariables: BetterUIDB
 
@@ -18,3 +18,4 @@ CharSecondaryStatRatings.lua
 CharacterEquipmentAudit.lua
 ActionBarClickThrough.lua
 MerchantAssistant.lua
+MythicPlusTweaks.lua

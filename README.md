@@ -81,6 +81,15 @@ All merchant actions are disabled by default.
 
 ---
 
+## Mythic+ Tweaks
+
+- Cast earned dungeon portals directly from Mythic+ dungeon icons; unearned portals are gray and not clickable.
+- Shows season-best level, clear time, and dungeon score on each icon.
+- Highlights the owned keystone dungeon and adds its level to the tooltip.
+- Displays a subtle portal cooldown swipe and exact remaining time in the tooltip.
+
+---
+
 ## Action Bar Tweaks
 
 The Action Bar Control Center provides per-bar checkboxes for Action Bars 1-8. Each bar can be configured independently without entering action bar IDs manually.

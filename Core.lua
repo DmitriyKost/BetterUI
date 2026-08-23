@@ -36,6 +36,9 @@ local defaults = {
 	merchantSellJunk = false,
 	merchantAutoRepair = false,
 	merchantUseGuildRepair = true,
+	enableMythicPlusTweaks = true,
+	mythicPlusShowRunStats = true,
+	mythicPlusHighlightOwnedKeystone = true,
 
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",
@@ -113,4 +116,5 @@ function NS.ApplySettings()
 	ApplyFeature("CharSecondaryStatRatings", db.enableCharSecondaryStatRatings)
 	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
 	ApplyFeature("MerchantAssistant", true)
+	ApplyFeature("MythicPlusTweaks", db.enableMythicPlusTweaks)
 end
