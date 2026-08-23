@@ -69,6 +69,23 @@ local function GetDetailedItemLevel(itemLink)
 	return nil
 end
 
+local function IsEquippable(itemLink)
+	local func = C_Item and C_Item.IsEquippableItem or IsEquippableItem
+	return SafeCall(func, itemLink) == true
+end
+
+local function CreateItemLevelText(button)
+	local level = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	level:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+	level:SetTextColor(1, 1, 1)
+	local fontPath, fontSize = level:GetFont()
+	if fontPath and fontSize then
+		level:SetFont(fontPath, fontSize, "OUTLINE")
+	end
+	level:SetShadowOffset(0, 0)
+	return level
+end
+
 local function HasEnchant(itemLink)
 	local enchantID = itemLink and itemLink:match("item:%d+:(%-?%d+)")
 	enchantID = tonumber(enchantID)
@@ -187,14 +204,7 @@ local function EnsureOverlay(buttonName)
 		return button
 	end
 
-	local level = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	level:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
-	level:SetTextColor(1, 1, 1)
-	local fontPath, fontSize = level:GetFont()
-	if fontPath and fontSize then
-		level:SetFont(fontPath, fontSize, "OUTLINE")
-	end
-	level:SetShadowOffset(0, 0)
+	local level = CreateItemLevelText(button)
 
 	local enchantBorder = button:CreateTexture(nil, "OVERLAY", nil, 6)
 	enchantBorder:SetSize(10, 10)
@@ -258,6 +268,88 @@ end
 local function HideOverlays()
 	HideEquipment(false)
 	HideEquipment(true)
+end
+
+local function UpdateBagButton(button, showItemLevel)
+	if not showItemLevel and not button._buiBagItemLevel then
+		return
+	end
+
+	if not button._buiBagItemLevel then
+		button._buiBagItemLevel = CreateItemLevelText(button)
+		button._buiBagItemLevel:SetDrawLayer("OVERLAY", 8)
+	end
+
+	if not showItemLevel then
+		button._buiBagItemLevel:Hide()
+		return
+	end
+
+	local itemLink = C_Container.GetContainerItemLink(button:GetBagID(), button:GetID())
+	if not itemLink or not IsEquippable(itemLink) then
+		button._buiBagItemLevel:Hide()
+		return
+	end
+
+	local itemLevel = GetDetailedItemLevel(itemLink)
+	button._buiBagItemLevel:SetText(itemLevel or "")
+	button._buiBagItemLevel:SetShown(itemLevel ~= nil)
+end
+
+local function UpdateBagFrame(frame)
+	if not frame or not frame.EnumerateValidItems then
+		return
+	end
+
+	local db = _G.BetterUIDB or NS.DB or {}
+	local showItemLevel = Feature._enabled and db.equipmentAuditShowBagItemLevels
+	for _, button in frame:EnumerateValidItems() do
+		UpdateBagButton(button, showItemLevel)
+	end
+end
+
+local function UpdateVisibleBags()
+	if not ContainerFrameUtil_EnumerateContainerFrames then
+		return
+	end
+
+	for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
+		if frame:IsShown() then
+			UpdateBagFrame(frame)
+		end
+	end
+end
+
+local function HookBagFrame(frame)
+	if not frame or frame._buiItemLevelHooked or not frame.UpdateItems then
+		return
+	end
+
+	frame._buiItemLevelHooked = true
+	hooksecurefunc(frame, "UpdateItems", function()
+		UpdateBagFrame(frame)
+	end)
+end
+
+local function EnsureBagHooks()
+	if not ContainerFrame_GenerateFrame or not ContainerFrameUtil_EnumerateContainerFrames then
+		return false
+	end
+
+	if not Feature._bagGeneratorHooked then
+		Feature._bagGeneratorHooked = true
+		hooksecurefunc("ContainerFrame_GenerateFrame", function(frame)
+			HookBagFrame(frame)
+			UpdateBagFrame(frame)
+		end)
+	end
+
+	for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
+		HookBagFrame(frame)
+	end
+	HookBagFrame(ContainerFrameCombinedBags)
+
+	return true
 end
 
 local function UpdateSlot(slot, buttonName, unit)
@@ -357,6 +449,7 @@ end
 function Feature:Refresh()
 	if not self._enabled then
 		HideOverlays()
+		UpdateVisibleBags()
 		return
 	end
 	if InCombatLockdown() then
@@ -380,6 +473,7 @@ function Feature:Refresh()
 	else
 		HideEquipment(true)
 	end
+	UpdateVisibleBags()
 end
 
 function Feature:ScheduleRefresh(delay)
@@ -417,6 +511,10 @@ function Feature:TryAttach()
 		attached = true
 	end
 
+	if EnsureBagHooks() then
+		attached = true
+	end
+
 	return attached
 end
 
@@ -430,6 +528,7 @@ function Feature:Disable()
 	self._enabled = false
 	self._pendingRefresh = false
 	HideOverlays()
+	UpdateVisibleBags()
 end
 
 EventFrame:RegisterEvent("ADDON_LOADED")
@@ -439,10 +538,15 @@ EventFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 EventFrame:RegisterEvent("INSPECT_READY")
 EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 
 EventFrame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
-		if arg1 ~= ADDON_NAME and arg1 ~= "Blizzard_CharacterUI" and arg1 ~= "Blizzard_InspectUI" then
+		if arg1 ~= ADDON_NAME
+			and arg1 ~= "Blizzard_CharacterUI"
+			and arg1 ~= "Blizzard_InspectUI"
+			and arg1 ~= "Blizzard_UIPanels_Game"
+		then
 			return
 		end
 		Feature:TryAttach()

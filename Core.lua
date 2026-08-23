@@ -47,6 +47,7 @@ local defaults = {
 	enableCharSecondaryStatRatings = true,
 	enableCharacterEquipmentAudit = true,
 	equipmentAuditShowItemLevels = true,
+	equipmentAuditShowBagItemLevels = true,
 	equipmentAuditShowEnchants = true,
 	equipmentAuditShowSockets = true,
 	equipmentAuditShowCharacterFrame = true,

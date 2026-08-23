@@ -296,6 +296,11 @@ local function BuildPanelUI(panel)
 				key = "equipmentAuditShowItemLevels",
 			},
 			{
+				label = "Show item levels in bags",
+				tooltip = "Show item level text on equippable items in your bags.",
+				key = "equipmentAuditShowBagItemLevels",
+			},
+			{
 				label = "Show enchant indicators",
 				tooltip = "Show enchant badges and missing-enchant warnings.",
 				key = "equipmentAuditShowEnchants",
