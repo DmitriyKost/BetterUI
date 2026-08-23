@@ -142,7 +142,7 @@ or via slash command:
 /bui
 ```
 
-Settings are grouped into collapsible sections, and their expanded state is remembered between sessions.
+Settings sections are collapsed by default and remember their expanded state between sessions.
 
 ---
 

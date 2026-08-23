@@ -238,7 +238,7 @@ local function CreateCollapsibleSection(panel, root, key, title)
 		if persist then
 			_G.BetterUIDB = _G.BetterUIDB or {}
 			_G.BetterUIDB.settingsCollapsedSections = _G.BetterUIDB.settingsCollapsedSections or {}
-			_G.BetterUIDB.settingsCollapsedSections[self.key] = self.collapsed or nil
+			_G.BetterUIDB.settingsCollapsedSections[self.key] = self.collapsed
 			NS.DB = _G.BetterUIDB
 		end
 		self:RefreshHeight()
@@ -246,7 +246,7 @@ local function CreateCollapsibleSection(panel, root, key, title)
 
 	function section:RefreshCollapsedState()
 		local collapsed = (_G.BetterUIDB or {}).settingsCollapsedSections
-		self:SetCollapsed(type(collapsed) == "table" and collapsed[self.key] == true, false)
+		self:SetCollapsed(type(collapsed) ~= "table" or collapsed[self.key] ~= false, false)
 	end
 
 	header:SetScript("OnClick", function()
