@@ -120,7 +120,7 @@ local function EnsureBackdrop(frame)
 	}
 	frame._buiModernBackdrop = backdrop
 	UpdateBackdropColor(frame)
-	UpdateBackdropAnchors(frame, frame.editBox and frame.editBox:IsShown())
+	UpdateBackdropAnchors(frame, false)
 	return backdrop
 end
 
@@ -166,10 +166,9 @@ local function UpdateTabVisual(tab)
 	end
 
 	local selected = tab._buiModernSelected
-	local hovered = tab:IsMouseOver()
-	tab._buiModernUnderline:SetShown(selected or hovered)
-	tab._buiModernUnderline:SetHeight(selected and 2 or 1)
-	tab._buiModernUnderline:SetAlpha(selected and 0.9 or 0.4)
+	tab._buiModernUnderline:SetShown(selected)
+	tab._buiModernUnderline:SetHeight(2)
+	tab._buiModernUnderline:SetAlpha(0.9)
 
 	local color = tab.selectedColorTable or DEFAULT_TAB_SELECTED_COLOR_TABLE or NORMAL_FONT_COLOR
 	tab._buiModernUnderline:SetColorTexture(color.r, color.g, color.b, 1)
@@ -186,17 +185,6 @@ local function EnsureTab(tab)
 	underline:SetHeight(2)
 
 	tab._buiModernUnderline = underline
-
-	tab:HookScript("OnEnter", function(self)
-		if Feature._enabled then
-			UpdateTabVisual(self)
-		end
-	end)
-	tab:HookScript("OnLeave", function(self)
-		if Feature._enabled then
-			UpdateTabVisual(self)
-		end
-	end)
 end
 
 local function StyleTab(tab, selected)
@@ -267,7 +255,7 @@ local function UpdateEditBoxVisual(editBox, focused)
 	end
 
 	local r, g, b = NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b
-	if focused and editBox.header and editBox.header:IsShown() then
+	if focused and editBox.header then
 		r, g, b = editBox.header:GetTextColor()
 	end
 
@@ -285,8 +273,11 @@ local function EnsureEditBox(editBox)
 	focusLine:SetPoint("TOPRIGHT", editBox, "TOPRIGHT", -8, 0)
 	focusLine:SetHeight(1)
 	editBox._buiModernFocusLine = focusLine
+	editBox._buiModernFocused = false
+	editBox._buiModernInputShown = false
 
 	editBox:HookScript("OnEditFocusGained", function(self)
+		self._buiModernFocused = true
 		if not Feature._enabled then
 			return
 		end
@@ -296,24 +287,28 @@ local function EnsureEditBox(editBox)
 		end
 	end)
 	editBox:HookScript("OnEditFocusLost", function(self)
+		self._buiModernFocused = false
 		if not Feature._enabled then
 			return
 		end
 		UpdateEditBoxVisual(self, false)
 		if self.chatFrame then
-			SetBackdropState(self.chatFrame, self.chatFrame._buiModernHovered or self.chatFrame.hasBeenFaded == true)
+			SetBackdropState(self.chatFrame, false)
 		end
 	end)
 	editBox:HookScript("OnShow", function(self)
+		self._buiModernInputShown = true
 		if Feature._enabled and self.chatFrame then
 			UpdateBackdropAnchors(self.chatFrame, true)
-			SetBackdropState(self.chatFrame, true)
+			SetBackdropState(self.chatFrame, self._buiModernFocused)
 		end
 	end)
 	editBox:HookScript("OnHide", function(self)
+		self._buiModernInputShown = false
+		self._buiModernFocused = false
 		if Feature._enabled and self.chatFrame then
 			UpdateBackdropAnchors(self.chatFrame, false)
-			SetBackdropState(self.chatFrame, self.chatFrame._buiModernHovered or self.chatFrame.hasBeenFaded == true)
+			SetBackdropState(self.chatFrame, false)
 		end
 	end)
 end
@@ -351,9 +346,9 @@ local function StyleEditBox(editBox)
 		editBox:SetPoint("TOPLEFT", editBox.chatFrame.Background, "BOTTOMLEFT")
 		editBox:SetPoint("TOPRIGHT", editBox.chatFrame.Background, "BOTTOMRIGHT")
 		editBox:SetHeight(28)
-		UpdateBackdropAnchors(editBox.chatFrame, editBox:IsShown())
+		UpdateBackdropAnchors(editBox.chatFrame, editBox._buiModernInputShown)
 	end
-	UpdateEditBoxVisual(editBox, editBox:HasFocus())
+	UpdateEditBoxVisual(editBox, editBox._buiModernFocused)
 end
 
 local function RestoreEditBox(editBox)
@@ -384,36 +379,6 @@ local function IsSelectedChatFrame(frame)
 	return GENERAL_CHAT_DOCK and FCFDock_GetSelectedWindow(GENERAL_CHAT_DOCK) == frame
 end
 
-local function IsChatFrameHovered(frame)
-	local tab = _G[frame:GetName() .. "Tab"]
-	return frame:IsMouseOver(28, -2, -2, 2)
-		or (tab and tab:IsMouseOver())
-		or (frame.ScrollBar and frame.ScrollBar:IsMouseOver())
-		or (frame.ScrollToBottomButton and frame.ScrollToBottomButton:IsMouseOver())
-		or (frame.buttonFrame and frame.buttonFrame:IsMouseOver())
-		or (frame.editBox and frame.editBox:IsShown() and frame.editBox:IsMouseOver())
-end
-
-local function EnsureFrameHoverHook(frame)
-	if frame._buiModernHoverHooked then
-		return
-	end
-
-	frame._buiModernHoverHooked = true
-	frame:HookScript("OnUpdate", function(self)
-		if not Feature._enabled then
-			return
-		end
-
-		local hovered = IsChatFrameHovered(self)
-		if hovered ~= self._buiModernHovered then
-			self._buiModernHovered = hovered
-			local focused = self.editBox and self.editBox:HasFocus()
-			SetBackdropState(self, hovered or focused or self.hasBeenFaded == true)
-		end
-	end)
-end
-
 local function StyleFrame(frame)
 	if not frame then
 		return
@@ -424,14 +389,9 @@ local function StyleFrame(frame)
 		frame._buiOriginalSpacing = frame:GetSpacing()
 	end
 
-	EnsureFrameHoverHook(frame)
 	HideNativeChatTextures(frame)
 	SetBackdropShown(frame, true)
-	frame._buiModernHovered = IsChatFrameHovered(frame)
-	SetBackdropState(
-		frame,
-		frame._buiModernHovered or frame.hasBeenFaded == true or (frame.editBox and frame.editBox:HasFocus())
-	)
+	SetBackdropState(frame, frame.editBox and frame.editBox._buiModernFocused)
 	StyleEditBox(frame.editBox)
 	StyleTab(_G[frame:GetName() .. "Tab"], IsSelectedChatFrame(frame))
 end
@@ -454,7 +414,6 @@ local function RestoreFrame(frame)
 	end
 	RestoreEditBox(frame.editBox)
 	RestoreTab(_G[frame:GetName() .. "Tab"])
-	frame._buiModernHovered = nil
 	frame._buiModernStyling = nil
 	frame._buiOriginalSpacing = nil
 end
@@ -482,27 +441,14 @@ function Feature:RestoreAll()
 end
 
 function Feature:InstallHooks()
-	if self._hooksInstalled or not FCF_FadeInChatFrame then
+	if self._hooksInstalled or not FCFTab_UpdateColors then
 		return false
 	end
 
 	self._hooksInstalled = true
-	hooksecurefunc("FCF_FadeInChatFrame", function(frame)
-		if self._enabled then
-			SetBackdropState(frame, true)
-		end
-	end)
-	hooksecurefunc("FCF_FadeOutChatFrame", function(frame)
-		if self._enabled then
-			SetBackdropState(frame, IsChatFrameHovered(frame) or (frame.editBox and frame.editBox:HasFocus()))
-		end
-	end)
 	hooksecurefunc("FCF_SetWindowAlpha", function(frame)
 		if self._enabled then
-			SetBackdropState(
-				frame,
-				IsChatFrameHovered(frame) or frame.hasBeenFaded == true or (frame.editBox and frame.editBox:HasFocus())
-			)
+			SetBackdropState(frame, frame.editBox and frame.editBox._buiModernFocused)
 		end
 	end)
 	hooksecurefunc("FCF_SetWindowColor", function(frame)

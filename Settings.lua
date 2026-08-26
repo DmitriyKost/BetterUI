@@ -349,8 +349,8 @@ local function BuildPanelUI(panel)
 
 		panel._buiModernChatDynamicOpacity = CreateCheckbox(
 			content,
-			"Emphasize chat on hover and focus",
-			"Increase backdrop opacity while interacting with chat, then fade it during gameplay.",
+			"Emphasize chat while typing",
+			"Increase backdrop opacity while the chat input has keyboard focus.",
 			"modernChatDynamicOpacity",
 			y,
 			32
