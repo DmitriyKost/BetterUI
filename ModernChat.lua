@@ -313,18 +313,50 @@ local function EnsureEditBox(editBox)
 	end)
 end
 
-local function CapturePoints(frame)
-	local points = {}
-	for index = 1, frame:GetNumPoints() do
-		points[index] = { frame:GetPoint(index) }
+local function HasSecretValue(...)
+	if not issecretvalue then
+		return false
 	end
-	return points
+	for index = 1, select("#", ...) do
+		if issecretvalue((select(index, ...))) then
+			return true
+		end
+	end
+	return false
+end
+
+local function CaptureGeometry(frame)
+	local numPoints = frame:GetNumPoints()
+	if HasSecretValue(numPoints) or type(numPoints) ~= "number" then
+		return nil
+	end
+
+	local points = {}
+	for index = 1, numPoints do
+		local point, relativeTo, relativePoint, x, y = frame:GetPoint(index)
+		if HasSecretValue(point, relativeTo, relativePoint, x, y) then
+			return nil
+		end
+		points[index] = {
+			point = point,
+			relativeTo = relativeTo,
+			relativePoint = relativePoint,
+			x = x,
+			y = y,
+		}
+	end
+
+	local height = frame:GetHeight()
+	if HasSecretValue(height) or type(height) ~= "number" then
+		return nil
+	end
+	return points, height
 end
 
 local function RestorePoints(frame, points)
 	frame:ClearAllPoints()
 	for _, point in ipairs(points or {}) do
-		frame:SetPoint(unpack(point))
+		frame:SetPoint(point.point, point.relativeTo, point.relativePoint, point.x, point.y)
 	end
 end
 
@@ -333,13 +365,17 @@ local function StyleEditBox(editBox)
 		return
 	end
 
-	EnsureEditBox(editBox)
 	if not editBox._buiModernStyling then
+		local points, height = CaptureGeometry(editBox)
+		if not points then
+			return
+		end
 		editBox._buiModernStyling = true
-		editBox._buiOriginalPoints = CapturePoints(editBox)
-		editBox._buiOriginalHeight = editBox:GetHeight()
+		editBox._buiOriginalPoints = points
+		editBox._buiOriginalHeight = height
 	end
 
+	EnsureEditBox(editBox)
 	HideNativeEditBoxTextures(editBox)
 	if editBox.chatFrame and editBox.chatFrame.Background then
 		editBox:ClearAllPoints()

@@ -10,6 +10,7 @@ Core.lua
 Settings.lua
 StaggerBar.lua
 BlackOxStatueRemoval.lua
+RoguePoisonReminder.lua
 HealthBar.lua
 Performance.lua
 ActionBarBorderHider.lua

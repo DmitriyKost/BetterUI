@@ -24,17 +24,6 @@ local EQUIPMENT_SLOTS = {
 	{ name = "CharacterSecondaryHandSlot", id = 17 },
 }
 
-local ENCHANTABLE_SLOTS = {
-	[1] = true,
-	[3] = true,
-	[5] = true,
-	[7] = true,
-	[8] = true,
-	[11] = true,
-	[12] = true,
-	[16] = true,
-}
-
 local EMPTY_SOCKET_TEXTURES = {
 	EMPTY_SOCKET_META = "Interface\\ItemSocketingFrame\\UI-EmptySocket-Meta",
 	EMPTY_SOCKET_RED = "Interface\\ItemSocketingFrame\\UI-EmptySocket-Red",
@@ -148,53 +137,6 @@ local function GetGemInfo(itemLink, index)
 	return gemItemID, SafeCall(iconFunc, gemItemID)
 end
 
-local function CanEnchant(slotID, itemLink)
-	if ENCHANTABLE_SLOTS[slotID] then
-		return true
-	end
-	if slotID ~= 17 then
-		return false
-	end
-
-	local func = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
-	if type(func) ~= "function" then
-		return false
-	end
-
-	local ok, _, _, _, equipLocation = pcall(func, itemLink)
-	if not ok then
-		return false
-	end
-	return equipLocation == "INVTYPE_WEAPON" or equipLocation == "INVTYPE_WEAPONOFFHAND"
-end
-
-local function AddTooltipAudit(tooltip)
-	local owner = tooltip and tooltip:GetOwner()
-	local messages = owner and owner._buiAuditMessages
-	if not Feature._enabled or not messages or #messages == 0 then
-		return
-	end
-
-	tooltip:AddLine(" ")
-	tooltip:AddLine("BetterUI Equipment Audit", 1, 0.82, 0)
-	for i = 1, #messages do
-		tooltip:AddLine(messages[i], 1, 0.25, 0.25)
-	end
-	tooltip:Show()
-end
-
-local function EnsureTooltipHook()
-	if Feature._tooltipHooked then
-		return
-	end
-	if not TooltipDataProcessor or not TooltipDataProcessor.AddTooltipPostCall or not Enum or not Enum.TooltipDataType then
-		return
-	end
-
-	Feature._tooltipHooked = true
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, AddTooltipAudit)
-end
-
 local function EnsureOverlay(buttonName)
 	local button = _G[buttonName]
 	if not button then
@@ -235,14 +177,6 @@ local function EnsureOverlay(buttonName)
 	button._buiAuditEnchantBackground = enchantBackground
 	button._buiAuditSockets = {}
 
-	if not Feature._tooltipHooked then
-		button:HookScript("OnEnter", function(self)
-			if GameTooltip:IsOwned(self) then
-				AddTooltipAudit(GameTooltip)
-			end
-		end)
-	end
-
 	return button
 end
 
@@ -260,7 +194,6 @@ local function HideEquipment(inspecting)
 				button._buiAuditSockets[socket].border:Hide()
 				button._buiAuditSockets[socket].icon:Hide()
 			end
-			button._buiAuditMessages = nil
 		end
 	end
 end
@@ -320,36 +253,33 @@ local function UpdateVisibleBags()
 	end
 end
 
-local function HookBagFrame(frame)
-	if not frame or frame._buiItemLevelHooked or not frame.UpdateItems then
-		return
+local function DidVisibleBagsChange()
+	local previous = Feature._visibleBagFrames or {}
+	local current = {}
+
+	if ContainerFrameUtil_EnumerateContainerFrames then
+		for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
+			if frame:IsShown() then
+				current[frame] = true
+			end
+		end
+	end
+	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsShown() then
+		current[ContainerFrameCombinedBags] = true
 	end
 
-	frame._buiItemLevelHooked = true
-	hooksecurefunc(frame, "UpdateItems", function()
-		UpdateBagFrame(frame)
-	end)
-end
-
-local function EnsureBagHooks()
-	if not ContainerFrame_GenerateFrame or not ContainerFrameUtil_EnumerateContainerFrames then
-		return false
+	Feature._visibleBagFrames = current
+	for frame in pairs(current) do
+		if not previous[frame] then
+			return true
+		end
 	end
-
-	if not Feature._bagGeneratorHooked then
-		Feature._bagGeneratorHooked = true
-		hooksecurefunc("ContainerFrame_GenerateFrame", function(frame)
-			HookBagFrame(frame)
-			UpdateBagFrame(frame)
-		end)
+	for frame in pairs(previous) do
+		if not current[frame] then
+			return true
+		end
 	end
-
-	for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
-		HookBagFrame(frame)
-	end
-	HookBagFrame(ContainerFrameCombinedBags)
-
-	return true
+	return false
 end
 
 local function UpdateSlot(slot, buttonName, unit)
@@ -368,7 +298,6 @@ local function UpdateSlot(slot, buttonName, unit)
 			button._buiAuditSockets[socket].border:Hide()
 			button._buiAuditSockets[socket].icon:Hide()
 		end
-		button._buiAuditMessages = nil
 		return
 	end
 
@@ -381,16 +310,11 @@ local function UpdateSlot(slot, buttonName, unit)
 		button._buiAuditLevel:Hide()
 	end
 
-	local messages = {}
 	if db.equipmentAuditShowEnchants then
 		local hasEnchant = HasEnchant(itemLink)
 		button._buiAuditEnchant:SetShown(hasEnchant)
 		button._buiAuditEnchantBorder:SetShown(hasEnchant)
 		button._buiAuditEnchantBackground:SetShown(hasEnchant)
-
-		if CanEnchant(slot.id, itemLink) and not hasEnchant then
-			messages[#messages + 1] = "Missing enchant"
-		end
 	else
 		button._buiAuditEnchant:Hide()
 		button._buiAuditEnchantBorder:Hide()
@@ -398,7 +322,6 @@ local function UpdateSlot(slot, buttonName, unit)
 	end
 
 	local socketTypes = db.equipmentAuditShowSockets and GetSocketTypes(itemLink) or {}
-	local emptySockets = 0
 	for index = 1, #socketTypes do
 		local socket = button._buiAuditSockets[index]
 		if not socket then
@@ -420,7 +343,6 @@ local function UpdateSlot(slot, buttonName, unit)
 		if gemLink then
 			socket.icon:SetTexture(gemIcon or DEFAULT_EMPTY_SOCKET_TEXTURE)
 		else
-			emptySockets = emptySockets + 1
 			socket.icon:SetTexture(EMPTY_SOCKET_TEXTURES[socketTypes[index]] or DEFAULT_EMPTY_SOCKET_TEXTURE)
 		end
 		socket.border:Show()
@@ -431,11 +353,6 @@ local function UpdateSlot(slot, buttonName, unit)
 		button._buiAuditSockets[index].icon:Hide()
 	end
 
-	if emptySockets > 0 then
-		messages[#messages + 1] = emptySockets == 1 and "1 empty socket" or (emptySockets .. " empty sockets")
-	end
-
-	button._buiAuditMessages = messages
 end
 
 local function UpdateEquipment(unit, inspecting)
@@ -489,29 +406,16 @@ function Feature:ScheduleRefresh(delay)
 end
 
 function Feature:TryAttach()
-	EnsureTooltipHook()
 	local attached = false
-	if CharacterFrame and not self._characterFrameHooked then
-		self._characterFrameHooked = true
-		CharacterFrame:HookScript("OnShow", function()
-			self:ScheduleRefresh(0.1)
-		end)
-	end
 	if CharacterFrame then
 		attached = true
 	end
 
-	if InspectFrame and not self._inspectFrameHooked then
-		self._inspectFrameHooked = true
-		InspectFrame:HookScript("OnShow", function()
-			self:ScheduleRefresh(0.1)
-		end)
-	end
 	if InspectFrame then
 		attached = true
 	end
 
-	if EnsureBagHooks() then
+	if ContainerFrameUtil_EnumerateContainerFrames then
 		attached = true
 	end
 
@@ -520,13 +424,29 @@ end
 
 function Feature:Enable()
 	self._enabled = true
+	self._pendingDisable = false
+	self._characterFrameShown = CharacterFrame and CharacterFrame:IsShown() or false
+	self._inspectFrameShown = InspectFrame and InspectFrame:IsShown() or false
+	self._visibleBagFrames = {}
 	self:TryAttach()
 	self:ScheduleRefresh()
 end
 
 function Feature:Disable()
+	if not self._enabled then
+		return
+	end
+	if InCombatLockdown() then
+		self._pendingDisable = true
+		return
+	end
+
 	self._enabled = false
+	self._pendingDisable = false
 	self._pendingRefresh = false
+	self._characterFrameShown = false
+	self._inspectFrameShown = false
+	self._visibleBagFrames = nil
 	HideOverlays()
 	UpdateVisibleBags()
 end
@@ -549,17 +469,53 @@ EventFrame:SetScript("OnEvent", function(_, event, arg1)
 		then
 			return
 		end
-		Feature:TryAttach()
+		if Feature._enabled then
+			Feature:TryAttach()
+		end
 	elseif event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" then
 		local inspectUnit = InspectFrame and InspectFrame.unit
 		if not inspectUnit or arg1 ~= inspectUnit then
 			return
 		end
-	elseif event == "PLAYER_REGEN_ENABLED" and not Feature._pendingRefresh then
-		return
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		if Feature._pendingDisable then
+			Feature:Disable()
+			return
+		end
+		if not Feature._pendingRefresh then
+			return
+		end
 	end
 
 	if Feature._enabled then
 		Feature:ScheduleRefresh(0.1)
 	end
+end)
+
+local visibilityElapsed = 0
+EventFrame:SetScript("OnUpdate", function(_, elapsed)
+	if not Feature._enabled then
+		return
+	end
+
+	visibilityElapsed = visibilityElapsed + elapsed
+	if visibilityElapsed < 0.2 then
+		return
+	end
+	visibilityElapsed = 0
+
+	local characterShown = CharacterFrame and CharacterFrame:IsShown() or false
+	local inspectShown = InspectFrame and InspectFrame:IsShown() or false
+	local bagsChanged = DidVisibleBagsChange()
+	if
+		characterShown == Feature._characterFrameShown
+		and inspectShown == Feature._inspectFrameShown
+		and not bagsChanged
+	then
+		return
+	end
+
+	Feature._characterFrameShown = characterShown
+	Feature._inspectFrameShown = inspectShown
+	Feature:ScheduleRefresh(0.1)
 end)

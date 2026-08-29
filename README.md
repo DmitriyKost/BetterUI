@@ -13,7 +13,7 @@ The addon is modular, so individual features can be enabled or disabled from the
 * Displays secondary stat ratings alongside percentages in the character panel.
 * Displays equipped item levels directly on equipment slots.
 * Displays item levels on equippable items in bags.
-* Shows enchant and socket icons, and flags missing enchants and empty sockets in item tooltips.
+* Shows enchant and socket indicators directly on equipped items.
 * Adds the same item level, enchant, and socket overlays when inspecting another player.
 * Provides separate settings for each overlay type and for character and inspect frames.
 
@@ -41,6 +41,14 @@ Creates safe clickable buttons that allow quick Black Ox Statue removal using ma
 /click [mod:alt] BUI_Utils_TotemButton4
 /cast [nomod,@cursor] Summon Black Ox Statue
 ```
+
+---
+
+## Rogue Tools
+
+### Poison Reminder
+
+Shows compact clickable poison icons when an applied poison has less than five minutes remaining or a poison from the established setup is removed. The reminder has a lockable drag handle, remembers its position, and keeps poison icons in stable slots while applying them. PvE suggestions use Instant plus Atrophic Poison for Outlaw and Subtlety; PvP mode uses Wound plus Crippling Poison. Assassination suggestions account for Dragon-Tempered Blades and can guide a two-lethal, two-non-lethal setup. Applying one suggestion leaves the remaining setup icons visible, while alternate poison choices still satisfy their matching slots.
 
 ---
 

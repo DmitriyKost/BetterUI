@@ -19,6 +19,9 @@ local defaults = {
 	enableStaggerBar = true,
 	enableHealthBar = true,
 	enableStatueKill = true,
+	enableRoguePoisonReminder = true,
+	roguePoisonUsePvPSuggestions = false,
+	roguePoisonReminderLocked = false,
 
 	enablePerformanceMonitor = false,
 
@@ -113,6 +116,7 @@ function NS.ApplySettings()
 	ApplyFeature("StaggerBar", db.enableStaggerBar)
 	ApplyFeature("HealthBar", db.enableHealthBar)
 	ApplyFeature("StatueKill", db.enableStatueKill)
+	ApplyFeature("RoguePoisonReminder", db.enableRoguePoisonReminder)
 	ApplyFeature("Performance", db.enablePerformanceMonitor)
 	ApplyFeature("ActionBarBorders", true)
 	ApplyFeature("ActionBarMacroText", true)

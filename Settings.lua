@@ -313,6 +313,53 @@ local function BuildPanelUI(panel)
 	end
 
 	do
+		local section = CreateCollapsibleSection(panel, root, "rogue", "Rogue")
+		local content = section.Content
+		local y = -4
+
+		panel._buiRoguePoisonEnable = CreateCheckbox(
+			content,
+			"Enable poison reminder",
+			"Shows clickable poison icons below five minutes and guides a complete spec-appropriate setup when starting without poisons.",
+			"enableRoguePoisonReminder",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiRoguePoisonEnable
+		y = y - 30
+
+		panel._buiRoguePoisonPvP = CreateCheckbox(
+			content,
+			"Use PvP poison suggestions",
+			"Suggests Wound and Crippling Poison, with additional Assassination poisons when Dragon-Tempered Blades is selected.",
+			"roguePoisonUsePvPSuggestions",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiRoguePoisonPvP
+		y = y - 30
+
+		panel._buiRoguePoisonLocked = CreateCheckbox(
+			content,
+			"Lock poison reminder position",
+			"Prevents dragging the poison reminder while keeping its spell icons clickable.",
+			"roguePoisonReminderLocked",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiRoguePoisonLocked
+		y = y - 30
+
+		panel._buiRefreshRoguePoisonEnabledState = function()
+			local enabled = (_G.BetterUIDB or {}).enableRoguePoisonReminder and true or false
+			SetCheckboxEnabled(panel._buiRoguePoisonPvP, enabled)
+			SetCheckboxEnabled(panel._buiRoguePoisonLocked, enabled)
+		end
+		panel._buiRoguePoisonEnable:HookScript("OnClick", panel._buiRefreshRoguePoisonEnabledState)
+		panel._buiRefreshRoguePoisonEnabledState()
+		section:SetContentHeight(-y + 4)
+	end
+
+	do
 		local section = CreateCollapsibleSection(panel, root, "general", "General")
 		local content = section.Content
 		local y = -4
@@ -438,7 +485,7 @@ local function BuildPanelUI(panel)
 		panel._buiEquipmentAuditEnable = CreateCheckbox(
 			content,
 			"Enable equipment audit",
-			"Shows item levels, enchants, sockets, and audit warnings on character and inspect frames.",
+			"Shows item levels, enchant badges, and socket indicators on character and inspect frames.",
 			"enableCharacterEquipmentAudit",
 			y
 		)
@@ -458,12 +505,12 @@ local function BuildPanelUI(panel)
 			},
 			{
 				label = "Show enchant indicators",
-				tooltip = "Show enchant badges and missing-enchant warnings.",
+				tooltip = "Show enchant badges on enchanted items.",
 				key = "equipmentAuditShowEnchants",
 			},
 			{
 				label = "Show socket indicators",
-				tooltip = "Show gem icons and empty-socket warnings.",
+				tooltip = "Show gem and empty-socket indicators.",
 				key = "equipmentAuditShowSockets",
 			},
 			{
@@ -865,6 +912,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshModernChatEnabledState then
 			self._buiRefreshModernChatEnabledState()
+		end
+		if self._buiRefreshRoguePoisonEnabledState then
+			self._buiRefreshRoguePoisonEnabledState()
 		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()
