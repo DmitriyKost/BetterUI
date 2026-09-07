@@ -391,7 +391,7 @@ function Feature:GetWarnings()
 		else
 			self.recommendationActive = true
 		end
-	elseif #active == 0 then
+	else
 		self.recommendationActive = true
 	end
 	if not self.slotBySpellID then
@@ -510,6 +510,9 @@ end
 
 function Feature:Enable()
 	self._enabled = true
+	if not IsRogue() then
+		return
+	end
 	local suggestionMode = GetDB().roguePoisonUsePvPSuggestions == true and "pvp" or "pve"
 	if self.suggestionMode and self.suggestionMode ~= suggestionMode then
 		self.recommendationActive = nil
@@ -544,6 +547,9 @@ EventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 EventFrame:RegisterEvent("AURA_DATA_PROVIDER_SWITCH")
 EventFrame:RegisterUnitEvent("UNIT_AURA", "player")
 EventFrame:SetScript("OnEvent", function(_, event, unit)
+	if not IsRogue() then
+		return
+	end
 	if event == "AURA_DATA_PROVIDER_SWITCH" then
 		Feature.auraDataRestricted = not unit
 	end

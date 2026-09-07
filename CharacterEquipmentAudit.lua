@@ -4,6 +4,7 @@ NS.Features = NS.Features or {}
 
 local Feature = {}
 NS.Features.CharacterEquipmentAudit = Feature
+Feature._bagButtons = setmetatable({}, { __mode = "k" })
 
 local EQUIPMENT_SLOTS = {
 	{ name = "CharacterHeadSlot", id = 1 },
@@ -211,6 +212,7 @@ local function UpdateBagButton(button, showItemLevel)
 	if not button._buiBagItemLevel then
 		button._buiBagItemLevel = CreateItemLevelText(button)
 		button._buiBagItemLevel:SetDrawLayer("OVERLAY", 8)
+		Feature._bagButtons[button] = true
 	end
 
 	if not showItemLevel then
@@ -242,44 +244,56 @@ local function UpdateBagFrame(frame)
 end
 
 local function UpdateVisibleBags()
-	if not ContainerFrameUtil_EnumerateContainerFrames then
-		return
-	end
-
-	for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
-		if frame:IsShown() then
-			UpdateBagFrame(frame)
-		end
-	end
-end
-
-local function DidVisibleBagsChange()
-	local previous = Feature._visibleBagFrames or {}
-	local current = {}
-
 	if ContainerFrameUtil_EnumerateContainerFrames then
 		for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
 			if frame:IsShown() then
-				current[frame] = true
+				UpdateBagFrame(frame)
 			end
 		end
 	end
 	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsShown() then
-		current[ContainerFrameCombinedBags] = true
+		UpdateBagFrame(ContainerFrameCombinedBags)
+	end
+end
+
+local function HideBagOverlays()
+	for button in pairs(Feature._bagButtons) do
+		button._buiBagItemLevel:Hide()
+	end
+end
+
+local function DidVisibleBagsChange()
+	local visible = Feature._visibleBagFrames or {}
+	local changed = false
+	for frame in pairs(visible) do
+		visible[frame] = false
 	end
 
-	Feature._visibleBagFrames = current
-	for frame in pairs(current) do
-		if not previous[frame] then
-			return true
+	if ContainerFrameUtil_EnumerateContainerFrames then
+		for _, frame in ContainerFrameUtil_EnumerateContainerFrames() do
+			if frame:IsShown() then
+				if visible[frame] == nil then
+					changed = true
+				end
+				visible[frame] = true
+			end
 		end
 	end
-	for frame in pairs(previous) do
-		if not current[frame] then
-			return true
+	if ContainerFrameCombinedBags and ContainerFrameCombinedBags:IsShown() then
+		if visible[ContainerFrameCombinedBags] == nil then
+			changed = true
+		end
+		visible[ContainerFrameCombinedBags] = true
+	end
+
+	Feature._visibleBagFrames = visible
+	for frame, shown in pairs(visible) do
+		if not shown then
+			visible[frame] = nil
+			changed = true
 		end
 	end
-	return false
+	return changed
 end
 
 local function UpdateSlot(slot, buttonName, unit)
@@ -366,7 +380,7 @@ end
 function Feature:Refresh()
 	if not self._enabled then
 		HideOverlays()
-		UpdateVisibleBags()
+		HideBagOverlays()
 		return
 	end
 	if InCombatLockdown() then
@@ -448,7 +462,7 @@ function Feature:Disable()
 	self._inspectFrameShown = false
 	self._visibleBagFrames = nil
 	HideOverlays()
-	UpdateVisibleBags()
+	HideBagOverlays()
 end
 
 EventFrame:RegisterEvent("ADDON_LOADED")
@@ -459,6 +473,7 @@ EventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 EventFrame:RegisterEvent("INSPECT_READY")
 EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+EventFrame:RegisterEvent("ITEM_DATA_LOAD_RESULT")
 
 EventFrame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
