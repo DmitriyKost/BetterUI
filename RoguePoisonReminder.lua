@@ -77,7 +77,7 @@ end
 local function CreateButton(parent, poison)
 	local button = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
 	button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-	button:RegisterForClicks("AnyUp")
+	button:RegisterForClicks("AnyUp", "AnyDown")
 	button:SetAttribute("type1", "spell")
 	button:SetAttribute("spell1", poison.spellID)
 	button.poison = poison
