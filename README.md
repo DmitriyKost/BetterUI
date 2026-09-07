@@ -68,11 +68,9 @@ Adds absorb value to health bars (requires Interface->Display->Status Text to be
 
 Updates Blizzard chat frames without replacing their native behavior:
 
-* Subtle dark tint framed by Blizzard's native chat border art.
-* Cleaner native-text tabs with a restrained active underline.
-* Full-width chat input integrated into the chat backdrop with a channel-colored focus rule.
-* Stronger backdrop while typing, with optional relaxed line spacing.
-* Preserves Edit Mode positioning, docking, temporary windows, hyperlinks, voice controls, and chat sending.
+* Removes decorative textures from chat tabs and the chat input.
+* Leaves Blizzard colors, opacity, dimming, spacing, and positioning unchanged.
+* Preserves docking, temporary windows, hyperlinks, voice controls, and chat sending.
 
 ---
 

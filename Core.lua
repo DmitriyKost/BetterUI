@@ -43,8 +43,6 @@ local defaults = {
 	mythicPlusShowRunStats = true,
 	mythicPlusHighlightOwnedKeystone = true,
 	enableModernChat = true,
-	modernChatDynamicOpacity = true,
-	modernChatRelaxedSpacing = true,
 
 	hideActionBarBorders = "",
 	hideActionBarMacroText = "",
