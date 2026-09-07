@@ -380,23 +380,6 @@ local function BuildPanelUI(panel)
 	end
 
 	do
-		local section = CreateCollapsibleSection(panel, root, "modernChat", "Modern Chat")
-		local content = section.Content
-		local y = -4
-
-		panel._buiModernChatEnable = CreateCheckbox(
-			content,
-			"Enable modern chat styling",
-			"Removes decorative tab and input borders while leaving Blizzard colors, opacity, spacing, and positioning unchanged.",
-			"enableModernChat",
-			y
-		)
-		panel._buiChecks[#panel._buiChecks + 1] = panel._buiModernChatEnable
-		y = y - 30
-		section:SetContentHeight(-y + 4)
-	end
-
-	do
 		local section = CreateCollapsibleSection(panel, root, "mythicPlus", "Mythic+")
 		local content = section.Content
 		local y = -4

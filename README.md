@@ -64,16 +64,6 @@ Adds absorb value to health bars (requires Interface->Display->Status Text to be
 
 ---
 
-## Modern Chat
-
-Updates Blizzard chat frames without replacing their native behavior:
-
-* Removes decorative textures from chat tabs and the chat input.
-* Leaves Blizzard colors, opacity, dimming, spacing, and positioning unchanged.
-* Preserves docking, temporary windows, hyperlinks, voice controls, and chat sending.
-
----
-
 ## Performance Monitor
 
 Optional movable on-screen performance text showing:
