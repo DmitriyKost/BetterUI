@@ -78,6 +78,12 @@ Optional movable on-screen performance text showing:
 
 ---
 
+## Spell History
+
+Optional movable row showing icons for the player's recent player-initiated spell casts and item-use spells. Passive proc and damage-tick events are ignored. Entries remain visible for ten seconds; queue length and icon size are configurable. Recording can be toggled independently for the world, dungeons, raids, arenas, and battlegrounds. Unlocked mode previews empty icon slots for positioning.
+
+---
+
 ## Merchant Assistant
 
 Optional merchant automation that can:

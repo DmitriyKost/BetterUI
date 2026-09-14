@@ -24,6 +24,15 @@ local defaults = {
 	roguePoisonReminderLocked = false,
 
 	enablePerformanceMonitor = false,
+	enableSpellHistory = false,
+	spellHistoryLocked = false,
+	spellHistoryIconSize = 38,
+	spellHistoryQueueSize = 6,
+	spellHistoryRecordWorld = false,
+	spellHistoryRecordDungeons = true,
+	spellHistoryRecordRaids = true,
+	spellHistoryRecordArenas = true,
+	spellHistoryRecordBattlegrounds = true,
 
 	perfShowFPS = true,
 	perfShowHomeMS = true,
@@ -115,6 +124,7 @@ function NS.ApplySettings()
 	ApplyFeature("StatueKill", db.enableStatueKill)
 	ApplyFeature("RoguePoisonReminder", db.enableRoguePoisonReminder)
 	ApplyFeature("Performance", db.enablePerformanceMonitor)
+	ApplyFeature("SpellHistory", db.enableSpellHistory)
 	ApplyFeature("ActionBarBorders", true)
 	ApplyFeature("ActionBarMacroText", true)
 	ApplyFeature("ActionBarClickThrough", true)

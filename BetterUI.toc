@@ -13,6 +13,7 @@ BlackOxStatueRemoval.lua
 RoguePoisonReminder.lua
 HealthBar.lua
 Performance.lua
+SpellHistory.lua
 ActionBarBorderHider.lua
 ActionBarMacroTextHider.lua
 CharSecondaryStatRatings.lua

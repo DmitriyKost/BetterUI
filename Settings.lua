@@ -380,6 +380,150 @@ local function BuildPanelUI(panel)
 	end
 
 	do
+		local section = CreateCollapsibleSection(panel, root, "spellHistory", "Spell History")
+		local content = section.Content
+		local y = -4
+
+		panel._buiSpellHistoryEnable = CreateCheckbox(
+			content,
+			"Enable spell history",
+			"Shows the player's six most recent player-initiated spell casts and item-use spells.",
+			"enableSpellHistory",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiSpellHistoryEnable
+		y = y - 30
+
+		panel._buiSpellHistoryLocked = CreateCheckbox(
+			content,
+			"Lock spell history position",
+			"Prevents dragging and hides empty preview slots.",
+			"spellHistoryLocked",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiSpellHistoryLocked
+		y = y - 30
+
+		panel._buiSpellHistoryLocationChecks = {}
+		local locations = {
+			{ "Record in the world", "spellHistoryRecordWorld" },
+			{ "Record in dungeons", "spellHistoryRecordDungeons" },
+			{ "Record in raids", "spellHistoryRecordRaids" },
+			{ "Record in arenas", "spellHistoryRecordArenas" },
+			{ "Record in battlegrounds", "spellHistoryRecordBattlegrounds" },
+		}
+		for i = 1, #locations do
+			local option = locations[i]
+			local checkbox = CreateCheckbox(
+				content,
+				option[1],
+				"Allow spell history recording in this content type.",
+				option[2],
+				y,
+				32
+			)
+			panel._buiSpellHistoryLocationChecks[#panel._buiSpellHistoryLocationChecks + 1] = checkbox
+			panel._buiChecks[#panel._buiChecks + 1] = checkbox
+			y = y - 28
+		end
+		y = y - 22
+
+		local iconSize = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
+		iconSize:SetPoint("TOPLEFT", 32, y)
+		iconSize:SetMinMaxValues(24, 64)
+		iconSize:SetValueStep(2)
+		iconSize:SetObeyStepOnDrag(true)
+		iconSize:SetWidth(240)
+		iconSize.Low:SetText("24")
+		iconSize.High:SetText("64")
+		iconSize._key = "spellHistoryIconSize"
+		panel._buiSpellHistoryIconSize = iconSize
+
+		local function SetIconSizeLabel(value)
+			value = math.floor((tonumber(value) or 38) + 0.5)
+			iconSize.Text:SetText(("Icon size: %d"):format(value))
+		end
+		panel._buiSpellHistorySetIconSizeLabel = SetIconSizeLabel
+
+		iconSize:SetScript("OnValueChanged", function(self, value)
+			value = math.floor((tonumber(value) or 38) + 0.5)
+			_G.BetterUIDB = _G.BetterUIDB or {}
+			_G.BetterUIDB[self._key] = value
+			NS.DB = _G.BetterUIDB
+			SetIconSizeLabel(value)
+			if NS.FireSettingChanged then
+				NS.FireSettingChanged()
+			end
+		end)
+
+		local savedIconSize = tonumber((_G.BetterUIDB or {})[iconSize._key]) or 38
+		iconSize:SetValue(savedIconSize)
+		SetIconSizeLabel(savedIconSize)
+		y = y - 50
+
+		local queueSize = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
+		queueSize:SetPoint("TOPLEFT", 32, y)
+		queueSize:SetMinMaxValues(3, 12)
+		queueSize:SetValueStep(1)
+		queueSize:SetObeyStepOnDrag(true)
+		queueSize:SetWidth(240)
+		queueSize.Low:SetText("3")
+		queueSize.High:SetText("12")
+		queueSize._key = "spellHistoryQueueSize"
+		panel._buiSpellHistoryQueueSize = queueSize
+
+		local function SetQueueSizeLabel(value)
+			value = math.floor((tonumber(value) or 6) + 0.5)
+			queueSize.Text:SetText(("Visible icons: %d"):format(value))
+		end
+		panel._buiSpellHistorySetQueueSizeLabel = SetQueueSizeLabel
+
+		queueSize:SetScript("OnValueChanged", function(self, value)
+			value = math.floor((tonumber(value) or 6) + 0.5)
+			_G.BetterUIDB = _G.BetterUIDB or {}
+			_G.BetterUIDB[self._key] = value
+			NS.DB = _G.BetterUIDB
+			SetQueueSizeLabel(value)
+			if NS.FireSettingChanged then
+				NS.FireSettingChanged()
+			end
+		end)
+
+		local savedQueueSize = tonumber((_G.BetterUIDB or {})[queueSize._key]) or 6
+		queueSize:SetValue(savedQueueSize)
+		SetQueueSizeLabel(savedQueueSize)
+		y = y - 50
+
+		local reset = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+		reset:SetSize(140, 22)
+		reset:SetPoint("TOPLEFT", 32, y)
+		reset:SetText("Reset position")
+		reset:SetScript("OnClick", function()
+			local feature = NS.Features and NS.Features.SpellHistory
+			if feature and feature.ResetPosition then
+				feature:ResetPosition()
+			end
+		end)
+		panel._buiSpellHistoryReset = reset
+		y = y - 40
+
+		panel._buiRefreshSpellHistoryEnabledState = function()
+			local enabled = (_G.BetterUIDB or {}).enableSpellHistory and true or false
+			SetCheckboxEnabled(panel._buiSpellHistoryLocked, enabled)
+			for i = 1, #panel._buiSpellHistoryLocationChecks do
+				SetCheckboxEnabled(panel._buiSpellHistoryLocationChecks[i], enabled)
+			end
+			SetSliderEnabled(panel._buiSpellHistoryIconSize, enabled)
+			SetSliderEnabled(panel._buiSpellHistoryQueueSize, enabled)
+			panel._buiSpellHistoryReset:SetEnabled(enabled)
+		end
+		panel._buiSpellHistoryEnable:HookScript("OnClick", panel._buiRefreshSpellHistoryEnabledState)
+		panel._buiRefreshSpellHistoryEnabledState()
+		section:SetContentHeight(-y + 4)
+	end
+
+	do
 		local section = CreateCollapsibleSection(panel, root, "mythicPlus", "Mythic+")
 		local content = section.Content
 		local y = -4
@@ -851,6 +995,16 @@ local function BuildPanelUI(panel)
 				or (("%.2fs"):format(value):gsub("0s$", "s"))
 			self._buiPerfIntervalSlider.Text:SetText("Refresh interval: " .. text)
 		end
+		if self._buiSpellHistoryIconSize then
+			local value = tonumber(_G.BetterUIDB[self._buiSpellHistoryIconSize._key]) or 38
+			self._buiSpellHistoryIconSize:SetValue(value)
+			self._buiSpellHistorySetIconSizeLabel(value)
+		end
+		if self._buiSpellHistoryQueueSize then
+			local value = tonumber(_G.BetterUIDB[self._buiSpellHistoryQueueSize._key]) or 6
+			self._buiSpellHistoryQueueSize:SetValue(value)
+			self._buiSpellHistorySetQueueSizeLabel(value)
+		end
 		for i = 1, #self._buiActionBarChecks do
 			local cb = self._buiActionBarChecks[i]
 			local ids = ParseActionBarIDs(_G.BetterUIDB[cb._key])
@@ -864,6 +1018,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshRoguePoisonEnabledState then
 			self._buiRefreshRoguePoisonEnabledState()
+		end
+		if self._buiRefreshSpellHistoryEnabledState then
+			self._buiRefreshSpellHistoryEnabledState()
 		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()
