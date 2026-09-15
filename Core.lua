@@ -137,4 +137,5 @@ function NS.ApplySettings()
 	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
 	ApplyFeature("MerchantAssistant", true)
 	ApplyFeature("MythicPlusTweaks", db.enableMythicPlusTweaks)
+	ApplyFeature("CooldownManager", true)
 end

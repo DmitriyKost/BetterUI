@@ -737,6 +737,51 @@ local function NativeLayoutNeedsRefresh(frame)
 	return TextLayoutNeedsRefresh(frame)
 end
 
+local function WarnCombatEditModeDeferral()
+	if Feature._combatEditModeWarningShown then
+		return
+	end
+
+	Feature._combatEditModeWarningShown = true
+
+	local message = "|cff33ff99BetterUI|r: Player Cast Bar size may temporarily use "
+		.. "Blizzard's layout while Edit Mode is used in combat. "
+		.. "BetterUI will restore the full layout after combat."
+
+	if DEFAULT_CHAT_FRAME then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	else
+		print(message)
+	end
+end
+
+local function RecoverAfterEditMode(frame)
+	if not frame then
+		return
+	end
+
+	-- Edit Mode may have called SetLook(), which rewrites native dimensions,
+	-- text anchors/fonts and look-controlled region visibility.
+	RefreshSavedNativeStateAfterEditMode(frame)
+
+	-- These operations are already used by BetterUI during normal combat
+	-- spellcast events and do not touch Blizzard mixin state or managed layout.
+	-- Reapply them immediately so only structural size work remains deferred.
+	ArmRuntimeRefresh(8)
+
+	if IsStructuralUpdateBlocked(frame) then
+		Feature._pendingApply = true
+
+		if InCombatLockdown() and NativeLayoutNeedsRefresh(frame) then
+			WarnCombatEditModeDeferral()
+		end
+
+		return
+	end
+
+	QueueApply()
+end
+
 local function StartEditModeWatcher()
 	if Feature._editModeTicker then
 		return
@@ -755,21 +800,23 @@ local function StartEditModeWatcher()
 		if shown ~= wasShown then
 			Feature._editModeShown = shown
 
+			if shown and InCombatLockdown() then
+				WarnCombatEditModeDeferral()
+			end
+
 			-- Do not touch PlayerCastingBarFrame while Blizzard owns the
-			-- Edit Mode update stack. Reapply only after Edit Mode closes.
+			-- Edit Mode update stack. Once Edit Mode closes, restore all
+			-- combat-safe cosmetics immediately and defer only structural
+			-- sizing/layout work if combat still blocks it.
 			if wasShown and not shown then
 				local frame = PlayerCastingBarFrame
-
-				if frame then
-					RefreshSavedNativeStateAfterEditMode(frame)
-				end
 
 				if Feature._pendingDisable then
 					Feature:Disable()
 					return
 				end
 
-				QueueApply()
+				RecoverAfterEditMode(frame)
 			end
 
 			return
@@ -839,6 +886,7 @@ end
 function Feature:Enable()
 	self._enabled = true
 	self._pendingDisable = false
+	self._combatEditModeWarningShown = false
 
 	self:TryAttach()
 	StartEditModeWatcher()
@@ -869,6 +917,7 @@ function Feature:Disable()
 	self._enabled = false
 	self._pendingApply = false
 	self._pendingDisable = false
+	self._combatEditModeWarningShown = false
 	self._runtimeRefreshFrames = 0
 
 	runtimeDriver:Hide()
@@ -930,6 +979,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	end
 
 	if event == "PLAYER_REGEN_ENABLED" then
+		Feature._combatEditModeWarningShown = false
+
 		if Feature._pendingDisable then
 			Feature:Disable()
 			return
@@ -965,7 +1016,21 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		return
 	end
 
-	if event == "EDIT_MODE_LAYOUTS_UPDATED" or event == "UI_SCALE_CHANGED" then
+	if event == "EDIT_MODE_LAYOUTS_UPDATED" then
+		if Feature._enabled then
+			local frame = PlayerCastingBarFrame
+
+			if frame and not IsEditModeActive() then
+				RecoverAfterEditMode(frame)
+			else
+				QueueApply()
+			end
+		end
+
+		return
+	end
+
+	if event == "UI_SCALE_CHANGED" then
 		if Feature._enabled then
 			QueueApply()
 		end
