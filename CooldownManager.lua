@@ -2,7 +2,8 @@ local ADDON_NAME, NS = ...
 
 local FEATURE_NAME = "CooldownManager"
 local DECIMAL_THRESHOLD = 10
-local REDUCED_GLOW_TEXTURE_FACTOR = 0.875
+local PROC_GLOW_MASK_TEXTURE = "Interface\\AddOns\\BetterUI\\ProcGlowMask"
+local PROC_GLOW_MASK_INSET = 3
 local WINDWALKER_SPEC_ID = 269
 
 -- Heart of the Jade Serpent
@@ -42,6 +43,7 @@ editModeRefreshDriver:Hide()
 local hotjsOverlay
 local originalCountdownThresholds = setmetatable({}, { __mode = "k" })
 local originalGlowStates = setmetatable({}, { __mode = "k" })
+local procGlowMasks = setmetatable({}, { __mode = "k" })
 
 local function GetDB()
 	return _G.BetterUIDB or NS.DB or {}
@@ -103,75 +105,81 @@ local function RestoreCountdownThresholds()
 	wipe(originalCountdownThresholds)
 end
 
+local function GetOrCreateProcGlowMask(item, glow)
+	local mask = procGlowMasks[glow]
+
+	if not mask then
+		mask = glow:CreateMaskTexture()
+		mask:SetTexture(PROC_GLOW_MASK_TEXTURE)
+		procGlowMasks[glow] = mask
+	end
+
+	mask:ClearAllPoints()
+	mask:SetPoint("TOPLEFT", item, "TOPLEFT", PROC_GLOW_MASK_INSET, -PROC_GLOW_MASK_INSET)
+	mask:SetPoint("BOTTOMRIGHT", item, "BOTTOMRIGHT", -PROC_GLOW_MASK_INSET, PROC_GLOW_MASK_INSET)
+
+	return mask
+end
+
 local function ApplyReducedGlow(item)
 	local glow = item and item.SpellActivationAlert
 
-	if not glow
-		or not glow.ProcStartFlipbook
-		or not glow.ProcLoopFlipbook
-	then
+	if not glow or not glow.ProcStartFlipbook or not glow.ProcLoopFlipbook then
 		return
 	end
 
 	local state = originalGlowStates[glow]
 
 	if not state then
-		local startWidth, startHeight =
-			glow.ProcStartFlipbook:GetSize()
-
 		state = {
-			startWidth = startWidth,
-			startHeight = startHeight,
 			frameLevel = glow:GetFrameLevel(),
+			procStartBlendMode = glow.ProcStartFlipbook:GetBlendMode(),
+			procLoopBlendMode = glow.ProcLoopFlipbook:GetBlendMode(),
+			maskApplied = false,
 		}
 
 		originalGlowStates[glow] = state
 	end
 
-	-- Keep proc state visible while the GCD/cooldown swipe is active.
-	-- SpellActivationAlert and Cooldown are siblings, so establish the
-	-- intended visual ordering explicitly.
+	-- Proc state should remain visible while the GCD/cooldown swipe is active.
 	if item.Cooldown then
-		glow:SetFrameLevel(
-			item.Cooldown:GetFrameLevel() + 1
-		)
+		glow:SetFrameLevel(item.Cooldown:GetFrameLevel() + 1)
 	end
 
-	-- Do not scale SpellActivationAlert itself: ProcLoopFlipbook is normally
-	-- stretched across the entire alert frame, so shrinking the parent makes
-	-- the animation look like a smaller square inside the CDM icon.
-	--
-	-- Instead, keep Blizzard's frame, flipbook animations, alpha and timing
-	-- untouched and reduce only the animated textures around their center.
-	local glowWidth, glowHeight = glow:GetSize()
+	-- Preserve Blizzard's native SpellActivationAlert geometry and both
+	-- FlipBook animations. Only constrain their visible pixels to the thin
+	-- Cooldown Manager icon-border shape.
+	local mask = GetOrCreateProcGlowMask(item, glow)
 
-	glow.ProcLoopFlipbook:ClearAllPoints()
-	glow.ProcLoopFlipbook:SetPoint("CENTER", glow, "CENTER")
-	glow.ProcLoopFlipbook:SetSize(
-		glowWidth * REDUCED_GLOW_TEXTURE_FACTOR,
-		glowHeight * REDUCED_GLOW_TEXTURE_FACTOR
-	)
+	if not state.maskApplied then
+		glow.ProcStartFlipbook:AddMaskTexture(mask)
+		glow.ProcLoopFlipbook:AddMaskTexture(mask)
+		state.maskApplied = true
+	end
 
-	glow.ProcStartFlipbook:SetSize(
-		state.startWidth * REDUCED_GLOW_TEXTURE_FACTOR,
-		state.startHeight * REDUCED_GLOW_TEXTURE_FACTOR
-	)
+	-- The custom mask has a fully opaque ring, so it constrains the native
+	-- flipbook without attenuating its alpha. ADD keeps proc highlights easy
+	-- to notice while preserving Blizzard's original animation frames/timing.
+	glow.ProcStartFlipbook:SetBlendMode("ADD")
+	glow.ProcLoopFlipbook:SetBlendMode("ADD")
 end
 
 local function RestoreReducedGlows()
 	for glow, state in pairs(originalGlowStates) do
 		glow:SetFrameLevel(state.frameLevel)
 
-		if glow.ProcStartFlipbook then
-			glow.ProcStartFlipbook:SetSize(
-				state.startWidth,
-				state.startHeight
-			)
-		end
+		local mask = procGlowMasks[glow]
 
-		if glow.ProcLoopFlipbook then
-			glow.ProcLoopFlipbook:ClearAllPoints()
-			glow.ProcLoopFlipbook:SetAllPoints(glow)
+		if mask and state.maskApplied then
+			if glow.ProcStartFlipbook then
+				glow.ProcStartFlipbook:RemoveMaskTexture(mask)
+				glow.ProcStartFlipbook:SetBlendMode(state.procStartBlendMode)
+			end
+
+			if glow.ProcLoopFlipbook then
+				glow.ProcLoopFlipbook:RemoveMaskTexture(mask)
+				glow.ProcLoopFlipbook:SetBlendMode(state.procLoopBlendMode)
+			end
 		end
 	end
 
