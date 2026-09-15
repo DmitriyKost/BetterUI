@@ -12,6 +12,7 @@ local MIN_HEIGHT = 10
 local MAX_HEIGHT = 40
 
 local BORDER_SIZE = 2
+local FILL_HORIZONTAL_CROP = 0.035
 local SPARK_VISIBLE_WIDTH = 2
 local RUNTIME_REFRESH_FRAMES = 3
 local STRUCTURAL_SETTLE_SECONDS = 1.25
@@ -240,22 +241,22 @@ local function EnsureCustomRegions(frame)
 	local top = Feature._edges[1]
 	top:SetPoint("TOPLEFT", frame, "TOPLEFT", -1, 1)
 	top:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 1)
-	top:SetHeight(BORDER_SIZE + 1)
+	top:SetHeight(BORDER_SIZE)
 
 	local bottom = Feature._edges[2]
 	bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -1, -1)
 	bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1, -1)
-	bottom:SetHeight(BORDER_SIZE + 1)
+	bottom:SetHeight(BORDER_SIZE)
 
 	local left = Feature._edges[3]
 	left:SetPoint("TOPLEFT", frame, "TOPLEFT", -1, 1)
 	left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -1, -1)
-	left:SetWidth(BORDER_SIZE + 1)
+	left:SetWidth(BORDER_SIZE)
 
 	local right = Feature._edges[4]
 	right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 1)
 	right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1, -1)
-	right:SetWidth(BORDER_SIZE + 1)
+	right:SetWidth(BORDER_SIZE)
 end
 
 local function SetCustomRegionsShown(shown)
@@ -268,11 +269,120 @@ local function SetCustomRegionsShown(shown)
 	end
 end
 
+local function CaptureTexCoords(texture)
+	if not texture then
+		return nil
+	end
+
+	return { texture:GetTexCoord() }
+end
+
+local function TexCoordsEqual(left, right)
+	if not left or not right or #left ~= #right then
+		return false
+	end
+
+	for i = 1, #left do
+		if math.abs((left[i] or 0) - (right[i] or 0)) > 0.000001 then
+			return false
+		end
+	end
+
+	return true
+end
+
+local function CropHorizontalTexCoords(coords, fraction)
+	if not coords then
+		return nil
+	end
+
+	if #coords >= 8 then
+		local ulx, uly = coords[1], coords[2]
+		local llx, lly = coords[3], coords[4]
+		local urx, ury = coords[5], coords[6]
+		local lrx, lry = coords[7], coords[8]
+
+		local function Lerp(from, to, amount)
+			return from + ((to - from) * amount)
+		end
+
+		return {
+			Lerp(ulx, urx, fraction),
+			Lerp(uly, ury, fraction),
+			Lerp(llx, lrx, fraction),
+			Lerp(lly, lry, fraction),
+			Lerp(urx, ulx, fraction),
+			Lerp(ury, uly, fraction),
+			Lerp(lrx, llx, fraction),
+			Lerp(lry, lly, fraction),
+		}
+	end
+
+	if #coords >= 4 then
+		local left, right, top, bottom = coords[1], coords[2], coords[3], coords[4]
+		local width = right - left
+
+		return {
+			left + (width * fraction),
+			right - (width * fraction),
+			top,
+			bottom,
+		}
+	end
+
+	return coords
+end
+
+local function SquareNativeFill(frame)
+	local texture = frame and frame:GetStatusBarTexture()
+
+	if not texture then
+		return
+	end
+
+	local current = CaptureTexCoords(texture)
+	local lastApplied = Feature._lastAppliedFillTexCoords
+
+	-- Blizzard resets the status-bar texture/atlas when the cast type changes
+	-- and again on successful completion. Capture that fresh native mapping,
+	-- but do not recursively crop our own already-cropped coordinates.
+	if not Feature._nativeFillTexCoords or not TexCoordsEqual(current, lastApplied) then
+		Feature._nativeFillTexCoords = current
+	end
+
+	local cropped = CropHorizontalTexCoords(Feature._nativeFillTexCoords, FILL_HORIZONTAL_CROP)
+
+	if cropped then
+		texture:SetTexCoord(unpack(cropped))
+		Feature._lastAppliedFillTexCoords = cropped
+	end
+end
+
+local function RestoreNativeFillTexCoords(frame)
+	local texture = frame and frame:GetStatusBarTexture()
+	local native = Feature._nativeFillTexCoords
+	local lastApplied = Feature._lastAppliedFillTexCoords
+
+	if texture and native and lastApplied then
+		local current = CaptureTexCoords(texture)
+
+		-- Restore only if the current mapping is still ours. If Blizzard has
+		-- already switched to another atlas, leave its fresh mapping alone.
+		if TexCoordsEqual(current, lastApplied) then
+			texture:SetTexCoord(unpack(native))
+		end
+	end
+
+	Feature._nativeFillTexCoords = nil
+	Feature._lastAppliedFillTexCoords = nil
+end
+
 local function FitNativeFill(frame, height)
 	local texture = frame:GetStatusBarTexture()
 
 	if texture then
 		texture:SetHeight(height)
+		SquareNativeFill(frame)
 	end
 end
 
@@ -398,13 +508,7 @@ local function AnchorSparkLinkedRegion(region, points, spark, originalSparkWidth
 	end
 
 	region:ClearAllPoints()
-	region:SetPoint(
-		anchorPoint,
-		spark,
-		"CENTER",
-		x - (originalSparkWidth * 0.5),
-		y
-	)
+	region:SetPoint(anchorPoint, spark, "CENTER", x - (originalSparkWidth * 0.5), y)
 end
 
 local function ApplyStructuralLayout(frame, width, height)
@@ -413,22 +517,10 @@ local function ApplyStructuralLayout(frame, width, height)
 	if frame.Spark then
 		frame.Spark:SetSize(SPARK_VISIBLE_WIDTH, height)
 
-		local originalSparkWidth = saved
-			and saved.sparkWidth
-			or 8
+		local originalSparkWidth = saved and saved.sparkWidth or 8
 
-		AnchorSparkLinkedRegion(
-			frame.StandardGlow,
-			saved and saved.standardGlowPoints,
-			frame.Spark,
-			originalSparkWidth
-		)
-		AnchorSparkLinkedRegion(
-			frame.CraftGlow,
-			saved and saved.craftGlowPoints,
-			frame.Spark,
-			originalSparkWidth
-		)
+		AnchorSparkLinkedRegion(frame.StandardGlow, saved and saved.standardGlowPoints, frame.Spark, originalSparkWidth)
+		AnchorSparkLinkedRegion(frame.CraftGlow, saved and saved.craftGlowPoints, frame.Spark, originalSparkWidth)
 		AnchorSparkLinkedRegion(
 			frame.ChannelShadow,
 			saved and saved.channelShadowPoints,
@@ -569,8 +661,14 @@ function Feature:RestoreStyle(preserveSavedState)
 		frame.BorderMask:SetSize(saved.borderMaskWidth, saved.borderMaskHeight)
 	end
 
+	RestoreNativeFillTexCoords(frame)
+
 	if saved.fillHeight then
-		FitNativeFill(frame, saved.fillHeight)
+		local texture = frame:GetStatusBarTexture()
+
+		if texture then
+			texture:SetHeight(saved.fillHeight)
+		end
 	end
 
 	if not preserveSavedState then
