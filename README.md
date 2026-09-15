@@ -70,6 +70,20 @@ Optional rectangular styling for Blizzard's player cast bar. The spell name and 
 
 ---
 
+## Cooldown Manager
+
+Optional refinements for Blizzard's Cooldown Manager:
+
+* Shows tenths of a second on tracked buff cooldowns below ten seconds.
+* Tightens proc glow animations around Essential and Utility cooldown icons while preserving Blizzard's animation timing.
+* Fixes Heart of the Jade Serpent countdowns for Windwalker Monks.
+
+Viewer position, icon size, layout, and tracked abilities remain controlled by Blizzard Edit Mode and Cooldown Manager settings.
+
+Whirling Dragon Punch and Unity Within Heart of the Jade Serpent procs are not additive, so they share the upper timer. Unity Within takes visual priority when they overlap and uses a Monk-green countdown because its effect is empowered to 200% of the regular proc. Zenith is additive with either primary proc, so it keeps an independent lower timer. This makes the duration of the strongest overlapping Heart of the Jade Serpent window visible while replacing Blizzard's ambiguous native countdown.
+
+---
+
 ## Performance Monitor
 
 Optional movable on-screen performance text showing:
@@ -86,7 +100,7 @@ Optional movable on-screen performance text showing:
 
 ## Spell History
 
-Optional movable row showing icons for the player's recent successful player-initiated spell casts and item-use spells. A cast is added only after `UNIT_SPELLCAST_SUCCEEDED`, so failed or interrupted casts never appear in the history. Each visible action (except the oldest one) shows the elapsed time since the previous action in `0.0` format. Passive proc and damage-tick events are ignored. Entries remain visible for ten seconds; queue length and icon size are configurable. Recording can be toggled independently for the world, dungeons, raids, arenas, and battlegrounds. Unlocked mode previews empty icon slots for positioning.
+Optional movable row showing icons for the player's recent successful player-initiated spell casts and item-use spells. Actions are added only after `UNIT_SPELLCAST_SUCCEEDED`, so failed attempts that never succeed are omitted. Each visible action (except the oldest one) shows the elapsed time since the previous action in `0.0` format. Passive proc and damage-tick events are ignored. Entries remain visible for ten seconds; queue length and icon size are configurable. Recording can be toggled independently for the world, dungeons, raids, arenas, and battlegrounds. Unlocked mode previews empty icon slots for positioning.
 
 ---
 
