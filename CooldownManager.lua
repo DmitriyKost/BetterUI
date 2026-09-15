@@ -2,6 +2,7 @@ local ADDON_NAME, NS = ...
 
 local FEATURE_NAME = "CooldownManager"
 local DECIMAL_THRESHOLD = 10
+local REDUCED_GLOW_TEXTURE_FACTOR = 0.875
 local WINDWALKER_SPEC_ID = 269
 
 -- Heart of the Jade Serpent
@@ -40,6 +41,7 @@ editModeRefreshDriver:Hide()
 -- of attaching permanent AuraContainers to pooled item identities.
 local hotjsOverlay
 local originalCountdownThresholds = setmetatable({}, { __mode = "k" })
+local originalGlowStates = setmetatable({}, { __mode = "k" })
 
 local function GetDB()
 	return _G.BetterUIDB or NS.DB or {}
@@ -47,6 +49,10 @@ end
 
 local function DecimalTimersEnabled()
 	return GetDB().cooldownManagerShowTenths and true or false
+end
+
+local function ReducedGlowEnabled()
+	return GetDB().cooldownManagerReduceGlowAnimation and true or false
 end
 
 local function IsWindwalker()
@@ -95,6 +101,115 @@ local function RestoreCountdownThresholds()
 	end
 
 	wipe(originalCountdownThresholds)
+end
+
+local function ApplyReducedGlow(item)
+	local glow = item and item.SpellActivationAlert
+
+	if not glow
+		or not glow.ProcStartFlipbook
+		or not glow.ProcLoopFlipbook
+	then
+		return
+	end
+
+	local state = originalGlowStates[glow]
+
+	if not state then
+		local startWidth, startHeight =
+			glow.ProcStartFlipbook:GetSize()
+
+		state = {
+			startWidth = startWidth,
+			startHeight = startHeight,
+			frameLevel = glow:GetFrameLevel(),
+		}
+
+		originalGlowStates[glow] = state
+	end
+
+	-- Keep proc state visible while the GCD/cooldown swipe is active.
+	-- SpellActivationAlert and Cooldown are siblings, so establish the
+	-- intended visual ordering explicitly.
+	if item.Cooldown then
+		glow:SetFrameLevel(
+			item.Cooldown:GetFrameLevel() + 1
+		)
+	end
+
+	-- Do not scale SpellActivationAlert itself: ProcLoopFlipbook is normally
+	-- stretched across the entire alert frame, so shrinking the parent makes
+	-- the animation look like a smaller square inside the CDM icon.
+	--
+	-- Instead, keep Blizzard's frame, flipbook animations, alpha and timing
+	-- untouched and reduce only the animated textures around their center.
+	local glowWidth, glowHeight = glow:GetSize()
+
+	glow.ProcLoopFlipbook:ClearAllPoints()
+	glow.ProcLoopFlipbook:SetPoint("CENTER", glow, "CENTER")
+	glow.ProcLoopFlipbook:SetSize(
+		glowWidth * REDUCED_GLOW_TEXTURE_FACTOR,
+		glowHeight * REDUCED_GLOW_TEXTURE_FACTOR
+	)
+
+	glow.ProcStartFlipbook:SetSize(
+		state.startWidth * REDUCED_GLOW_TEXTURE_FACTOR,
+		state.startHeight * REDUCED_GLOW_TEXTURE_FACTOR
+	)
+end
+
+local function RestoreReducedGlows()
+	for glow, state in pairs(originalGlowStates) do
+		glow:SetFrameLevel(state.frameLevel)
+
+		if glow.ProcStartFlipbook then
+			glow.ProcStartFlipbook:SetSize(
+				state.startWidth,
+				state.startHeight
+			)
+		end
+
+		if glow.ProcLoopFlipbook then
+			glow.ProcLoopFlipbook:ClearAllPoints()
+			glow.ProcLoopFlipbook:SetAllPoints(glow)
+		end
+	end
+
+	wipe(originalGlowStates)
+end
+
+local function ScanReducedGlowViewer(viewer)
+	local pool = viewer and viewer.itemFramePool
+
+	if not pool or not pool.EnumerateActive then
+		return
+	end
+
+	for item in pool:EnumerateActive() do
+		ApplyReducedGlow(item)
+	end
+end
+
+local function RefreshReducedGlows()
+	if not Feature._enabled or not ReducedGlowEnabled() then
+		return
+	end
+
+	ScanReducedGlowViewer(_G.EssentialCooldownViewer)
+	ScanReducedGlowViewer(_G.UtilityCooldownViewer)
+end
+
+local function QueueGlowRefresh()
+	if Feature._glowRefreshQueued then
+		return
+	end
+
+	Feature._glowRefreshQueued = true
+
+	C_Timer.After(0, function()
+		Feature._glowRefreshQueued = false
+		RefreshReducedGlows()
+	end)
 end
 
 local function IsHeartOfJadeSerpentItem(item)
@@ -468,20 +583,29 @@ local function AttachHotJSOverlay(item)
 	HideNativeHotJSTimer(item, state)
 end
 
-local function ScanBuffIconViewer()
+local function ScanCooldownManager()
 	if not Feature._enabled then
 		return
 	end
 
 	local decimalTimersEnabled = DecimalTimersEnabled()
+	local reducedGlowEnabled = ReducedGlowEnabled()
 	local windwalkerTweaksEnabled = WindwalkerTweaksEnabled()
 
 	if not decimalTimersEnabled then
 		RestoreCountdownThresholds()
 	end
 
+	if not reducedGlowEnabled then
+		RestoreReducedGlows()
+	end
+
 	if not windwalkerTweaksEnabled then
 		DetachHotJSOverlay(hotjsOverlay)
+	end
+
+	if reducedGlowEnabled then
+		RefreshReducedGlows()
 	end
 
 	local viewer = _G.BuffIconCooldownViewer
@@ -535,7 +659,7 @@ local function QueueScan()
 
 		C_Timer.After(delay, function()
 			if Feature._enabled and Feature._scanGeneration == generation then
-				ScanBuffIconViewer()
+				ScanCooldownManager()
 			end
 
 			if isLast and Feature._scanGeneration == generation then
@@ -562,7 +686,7 @@ editModeRefreshDriver:SetScript("OnUpdate", function(self, elapsed)
 		return
 	end
 
-	if not DecimalTimersEnabled() and not WindwalkerTweaksEnabled() then
+	if not DecimalTimersEnabled() and not ReducedGlowEnabled() and not WindwalkerTweaksEnabled() then
 		self:Hide()
 		return
 	end
@@ -587,7 +711,7 @@ editModeRefreshDriver:SetScript("OnUpdate", function(self, elapsed)
 	-- Blizzard may reconfigure pooled Cooldown items for several frames after
 	-- an Edit Mode resize. Re-run the canonical scan so frame rebinding,
 	-- decimal thresholds and native-timer suppression stay in sync.
-	ScanBuffIconViewer()
+	ScanCooldownManager()
 end)
 
 function Feature:Enable()
@@ -607,12 +731,14 @@ function Feature:Disable()
 
 	self._enabled = false
 	self._scanQueued = false
+	self._glowRefreshQueued = false
 	self._scanGeneration = (self._scanGeneration or 0) + 1
 	self._editModeRefreshUntil = nil
 	self._editModeRefreshElapsed = 0
 	editModeRefreshDriver:Hide()
 
 	RestoreCountdownThresholds()
+	RestoreReducedGlows()
 	DetachHotJSOverlay(hotjsOverlay)
 end
 
@@ -626,6 +752,7 @@ eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 eventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -639,6 +766,16 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	end
 
 	if event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 and arg1 ~= "player" then
+		return
+	end
+
+	if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+		if ReducedGlowEnabled() then
+			-- Blizzard creates SpellActivationAlert lazily while handling this
+			-- event. Defer one UI tick so the frame exists before styling it.
+			QueueGlowRefresh()
+		end
+
 		return
 	end
 

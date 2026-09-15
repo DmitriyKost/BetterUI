@@ -12,14 +12,18 @@ local MIN_HEIGHT = 10
 local MAX_HEIGHT = 40
 
 local BORDER_SIZE = 2
+local SPARK_VISIBLE_WIDTH = 2
 local RUNTIME_REFRESH_FRAMES = 3
+local STRUCTURAL_SETTLE_SECONDS = 1.25
 
 local Feature = NS.Features[FEATURE_NAME] or {}
 NS.Features[FEATURE_NAME] = Feature
 
 local eventFrame = CreateFrame("Frame")
 local runtimeDriver = CreateFrame("Frame")
+local structuralDriver = CreateFrame("Frame")
 runtimeDriver:Hide()
+structuralDriver:Hide()
 
 local hiddenRegions = {
 	"Border",
@@ -156,6 +160,9 @@ local function CaptureState(frame)
 
 		standardGlowWidth = frame.StandardGlow and frame.StandardGlow:GetWidth(),
 		standardGlowHeight = frame.StandardGlow and frame.StandardGlow:GetHeight(),
+		standardGlowPoints = frame.StandardGlow and CapturePoints(frame.StandardGlow),
+		craftGlowPoints = frame.CraftGlow and CapturePoints(frame.CraftGlow),
+		channelShadowPoints = frame.ChannelShadow and CapturePoints(frame.ChannelShadow),
 
 		borderMaskWidth = frame.BorderMask and frame.BorderMask:GetWidth(),
 		borderMaskHeight = frame.BorderMask and frame.BorderMask:GetHeight(),
@@ -374,18 +381,60 @@ local function ApplyRuntimeCosmetics(frame)
 	FitNativeFill(frame, frame:GetHeight())
 end
 
+local function AnchorSparkLinkedRegion(region, points, spark, originalSparkWidth)
+	if not region or not points or not points[1] or not spark then
+		return
+	end
+
+	local point = points[1]
+	local anchorPoint = point[1]
+	local relativeTo = point[2]
+	local relativePoint = point[3]
+	local x = point[4] or 0
+	local y = point[5] or 0
+
+	if relativeTo ~= spark or relativePoint ~= "LEFT" then
+		return
+	end
+
+	region:ClearAllPoints()
+	region:SetPoint(
+		anchorPoint,
+		spark,
+		"CENTER",
+		x - (originalSparkWidth * 0.5),
+		y
+	)
+end
+
 local function ApplyStructuralLayout(frame, width, height)
 	local saved = Feature._savedState
 
 	if frame.Spark then
-		local aspect = saved
-				and saved.sparkWidth
-				and saved.sparkHeight
-				and saved.sparkHeight > 0
-				and saved.sparkWidth / saved.sparkHeight
-			or 0.4
+		frame.Spark:SetSize(SPARK_VISIBLE_WIDTH, height)
 
-		frame.Spark:SetSize(height * aspect, height)
+		local originalSparkWidth = saved
+			and saved.sparkWidth
+			or 8
+
+		AnchorSparkLinkedRegion(
+			frame.StandardGlow,
+			saved and saved.standardGlowPoints,
+			frame.Spark,
+			originalSparkWidth
+		)
+		AnchorSparkLinkedRegion(
+			frame.CraftGlow,
+			saved and saved.craftGlowPoints,
+			frame.Spark,
+			originalSparkWidth
+		)
+		AnchorSparkLinkedRegion(
+			frame.ChannelShadow,
+			saved and saved.channelShadowPoints,
+			frame.Spark,
+			originalSparkWidth
+		)
 	end
 
 	if frame.ChannelShadow then
@@ -512,6 +561,10 @@ function Feature:RestoreStyle(preserveSavedState)
 		frame.StandardGlow:SetSize(saved.standardGlowWidth, saved.standardGlowHeight)
 	end
 
+	RestorePoints(frame.StandardGlow, saved.standardGlowPoints)
+	RestorePoints(frame.CraftGlow, saved.craftGlowPoints)
+	RestorePoints(frame.ChannelShadow, saved.channelShadowPoints)
+
 	if frame.BorderMask and saved.borderMaskWidth and saved.borderMaskHeight then
 		frame.BorderMask:SetSize(saved.borderMaskWidth, saved.borderMaskHeight)
 	end
@@ -604,6 +657,61 @@ runtimeDriver:SetScript("OnUpdate", function(self)
 	end
 end)
 
+local function NativeLayoutNeedsRefresh(frame)
+	if not frame then
+		return false
+	end
+
+	local width, height = GetDesiredSize()
+
+	return math.abs(frame:GetWidth() - width) > 0.5 or math.abs(frame:GetHeight() - height) > 0.5
+end
+
+local function ArmStructuralSettle(seconds)
+	if not Feature._enabled then
+		return
+	end
+
+	Feature._structuralRefreshUntil =
+		math.max(Feature._structuralRefreshUntil or 0, GetTime() + (seconds or STRUCTURAL_SETTLE_SECONDS))
+
+	structuralDriver:Show()
+end
+
+structuralDriver:SetScript("OnUpdate", function(self)
+	if not Feature._enabled then
+		Feature._structuralRefreshUntil = nil
+		self:Hide()
+		return
+	end
+
+	local refreshUntil = Feature._structuralRefreshUntil
+
+	if not refreshUntil or GetTime() >= refreshUntil then
+		Feature._structuralRefreshUntil = nil
+		self:Hide()
+		return
+	end
+
+	local frame = PlayerCastingBarFrame
+
+	if not frame then
+		return
+	end
+
+	if IsStructuralUpdateBlocked(frame) then
+		Feature._pendingApply = true
+		return
+	end
+
+	-- Blizzard can reapply its native 208x11/Edit Mode look after our first
+	-- login pass. Repair any structural drift during a short bounded window
+	-- instead of leaving the native height visible until a delayed retry.
+	if NativeLayoutNeedsRefresh(frame) then
+		Feature:ApplyStyle()
+	end
+end)
+
 local function WarnCombatEditModeDeferral()
 	if Feature._combatEditModeWarningShown then
 		return
@@ -629,8 +737,7 @@ local function WarnCombatSettingsDeferral()
 
 	Feature._combatSettingsWarningShown = true
 
-	local message = "|cff33ff99BetterUI|r: Player Cast Bar setting changes "
-		.. "are deferred until combat ends."
+	local message = "|cff33ff99BetterUI|r: Player Cast Bar setting changes " .. "are deferred until combat ends."
 
 	if DEFAULT_CHAT_FRAME then
 		DEFAULT_CHAT_FRAME:AddMessage(message)
@@ -698,11 +805,19 @@ local function OnEditModeExit()
 end
 
 function Feature:TryAttach()
-	if not PlayerCastingBarFrame then
+	local frame = PlayerCastingBarFrame
+
+	if not frame then
 		return false
 	end
 
-	QueueApply()
+	if IsStructuralUpdateBlocked(frame) then
+		self._pendingApply = true
+	else
+		self:ApplyStyle()
+	end
+
+	ArmStructuralSettle()
 	return true
 end
 
@@ -754,8 +869,10 @@ function Feature:Disable()
 	self._combatEditModeWarningShown = false
 	self._combatSettingsWarningShown = false
 	self._runtimeRefreshFrames = 0
+	self._structuralRefreshUntil = nil
 
 	runtimeDriver:Hide()
+	structuralDriver:Hide()
 	self._nativeStateExposedForEditMode = false
 
 	self:RestoreStyle()
@@ -842,6 +959,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 
 		if Feature._enabled and Feature._pendingApply then
 			QueueApply()
+			ArmStructuralSettle(0.5)
 		end
 
 		return
@@ -849,22 +967,9 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 
 	if event == "PLAYER_ENTERING_WORLD" then
 		if Feature._enabled then
-			QueueApply()
-
-			-- Blizzard may run SetLook()/Edit Mode initialization after our
-			-- first PLAYER_ENTERING_WORLD handler. Two later passes stabilize
-			-- the native frame without hooking Blizzard methods.
-			C_Timer.After(0.2, function()
-				if Feature._enabled then
-					QueueApply()
-				end
-			end)
-
-			C_Timer.After(1.0, function()
-				if Feature._enabled then
-					QueueApply()
-				end
-			end)
+			-- Apply immediately, then watch for Blizzard's late login/Edit Mode
+			-- initialization resetting the frame to its native 208x11 size.
+			Feature:TryAttach()
 		end
 
 		return

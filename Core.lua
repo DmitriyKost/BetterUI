@@ -29,6 +29,7 @@ local defaults = {
 	playerCastBarHeight = 18,
 	enableCooldownManager = true,
 	cooldownManagerShowTenths = true,
+	cooldownManagerReduceGlowAnimation = true,
 	cooldownManagerWindwalkerHotJS = true,
 	enableSpellHistory = false,
 	spellHistoryLocked = false,

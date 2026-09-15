@@ -469,6 +469,17 @@ local function BuildPanelUI(panel)
 		panel._buiChecks[#panel._buiChecks + 1] = panel._buiCooldownManagerTenths
 		y = y - 30
 
+		panel._buiCooldownManagerReduceGlow = CreateCheckbox(
+			content,
+			"Reduce glow animation",
+			"Keeps Blizzard's proc animation intact, but tightens the glow closer to the icon.",
+			"cooldownManagerReduceGlowAnimation",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiCooldownManagerReduceGlow
+		y = y - 30
+
 		panel._buiCooldownManagerWindwalker = CreateCheckbox(
 			content,
 			"Windwalker: fix Heart of the Jade Serpent timers",
@@ -483,6 +494,7 @@ local function BuildPanelUI(panel)
 		panel._buiRefreshCooldownManagerEnabledState = function()
 			local enabled = (_G.BetterUIDB or {}).enableCooldownManager and true or false
 			SetCheckboxEnabled(panel._buiCooldownManagerTenths, enabled)
+			SetCheckboxEnabled(panel._buiCooldownManagerReduceGlow, enabled)
 			SetCheckboxEnabled(panel._buiCooldownManagerWindwalker, enabled)
 		end
 		panel._buiCooldownManagerEnable:HookScript("OnClick", panel._buiRefreshCooldownManagerEnabledState)
