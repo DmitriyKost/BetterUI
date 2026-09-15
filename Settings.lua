@@ -68,6 +68,9 @@ local function SetSliderEnabled(slider, enabled)
 	if slider.SetEnabled then
 		slider:SetEnabled(enabled)
 	end
+	if slider._valueBox then
+		slider._valueBox:SetEnabled(enabled)
+	end
 
 	local function SetFS(fs)
 		if not fs or not fs.SetTextColor then
@@ -87,6 +90,72 @@ local function SetSliderEnabled(slider, enabled)
 	if slider.EnableMouse then
 		slider:EnableMouse(enabled)
 	end
+end
+
+
+local function AttachSliderValueBox(slider, parent, minimum, maximum, decimals)
+	local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+	box:SetSize(58, 20)
+	box:SetPoint("LEFT", slider, "RIGHT", 16, 0)
+	box:SetAutoFocus(false)
+	box:SetJustifyH("CENTER")
+	box:SetMaxLetters(8)
+	box:SetNumeric(false)
+	slider._valueBox = box
+
+	decimals = math.max(0, math.floor(tonumber(decimals) or 0))
+
+	local function FormatValue(value)
+		value = tonumber(value) or minimum
+		if decimals == 0 then
+			return tostring(math.floor(value + 0.5))
+		end
+		return ("%." .. decimals .. "f"):format(value):gsub("0+$", ""):gsub("%.$", "")
+	end
+
+	local function SyncValue(value)
+		if not box:HasFocus() then
+			box:SetText(FormatValue(value))
+		end
+	end
+
+	local function CommitValue()
+		local text = box:GetText():gsub(",", ".")
+		local value = tonumber(text)
+		if not value then
+			SyncValue(slider:GetValue())
+			box:ClearFocus()
+			return
+		end
+
+		value = math.max(minimum, math.min(maximum, value))
+		if decimals == 0 then
+			value = math.floor(value + 0.5)
+		else
+			local scale = 10 ^ decimals
+			value = math.floor(value * scale + 0.5) / scale
+		end
+
+		slider:SetValue(value)
+		box:ClearFocus()
+		box:SetText(FormatValue(slider:GetValue()))
+	end
+
+	box:SetScript("OnEnterPressed", CommitValue)
+	box:SetScript("OnEditFocusLost", function()
+		SyncValue(slider:GetValue())
+	end)
+	box:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+		self:SetText(FormatValue(slider:GetValue()))
+	end)
+
+	slider:HookScript("OnValueChanged", function(_, value)
+		SyncValue(value)
+	end)
+	SyncValue(slider:GetValue())
+
+	return box
 end
 
 local function ParseActionBarIDs(value)
@@ -424,12 +493,13 @@ local function BuildPanelUI(panel)
 			local value = tonumber((_G.BetterUIDB or {})[key]) or defaultValue
 			slider:SetValue(value)
 			SetLabel(value)
+			AttachSliderValueBox(slider, content, minimum, maximum, 0)
 			y = y - 50
 			return slider, SetLabel
 		end
 
 		panel._buiPlayerCastBarWidth, panel._buiPlayerCastBarSetWidthLabel =
-			CreateSizeSlider("playerCastBarWidth", "Width", 150, 500, 10, 240)
+			CreateSizeSlider("playerCastBarWidth", "Width", 150, 500, 1, 240)
 		panel._buiPlayerCastBarHeight, panel._buiPlayerCastBarSetHeightLabel =
 			CreateSizeSlider("playerCastBarHeight", "Height", 10, 40, 1, 18)
 
@@ -555,7 +625,7 @@ local function BuildPanelUI(panel)
 		local iconSize = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
 		iconSize:SetPoint("TOPLEFT", 32, y)
 		iconSize:SetMinMaxValues(24, 64)
-		iconSize:SetValueStep(2)
+		iconSize:SetValueStep(1)
 		iconSize:SetObeyStepOnDrag(true)
 		iconSize:SetWidth(240)
 		iconSize.Low:SetText("24")
@@ -583,6 +653,7 @@ local function BuildPanelUI(panel)
 		local savedIconSize = tonumber((_G.BetterUIDB or {})[iconSize._key]) or 38
 		iconSize:SetValue(savedIconSize)
 		SetIconSizeLabel(savedIconSize)
+		AttachSliderValueBox(iconSize, content, 24, 64, 0)
 		y = y - 50
 
 		local queueSize = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
@@ -616,6 +687,7 @@ local function BuildPanelUI(panel)
 		local savedQueueSize = tonumber((_G.BetterUIDB or {})[queueSize._key]) or 6
 		queueSize:SetValue(savedQueueSize)
 		SetQueueSizeLabel(savedQueueSize)
+		AttachSliderValueBox(queueSize, content, 3, 12, 0)
 		y = y - 50
 
 		local reset = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
@@ -1026,6 +1098,7 @@ local function BuildPanelUI(panel)
 		end)
 
 		Refresh()
+		AttachSliderValueBox(slider, content, 8, 24, 0)
 		y = y - 50
 	end
 
@@ -1033,7 +1106,7 @@ local function BuildPanelUI(panel)
 		local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
 		slider:SetPoint("TOPLEFT", 16, y)
 		slider:SetMinMaxValues(0.25, 2)
-		slider:SetValueStep(0.25)
+		slider:SetValueStep(0.01)
 		slider:SetObeyStepOnDrag(true)
 		slider:SetWidth(240)
 
@@ -1044,13 +1117,13 @@ local function BuildPanelUI(panel)
 		slider.High:SetText("2s")
 
 		local function SetLabel(value)
-			value = math.floor((tonumber(value) or 0.5) * 4 + 0.5) / 4
+			value = math.floor((tonumber(value) or 0.5) * 100 + 0.5) / 100
 			local text = value == math.floor(value) and ("%ds"):format(value) or (("%.2fs"):format(value):gsub("0s$", "s"))
 			slider.Text:SetText("Refresh interval: " .. text)
 		end
 
 		slider:SetScript("OnValueChanged", function(self, value)
-			value = math.floor((tonumber(value) or 0.5) * 4 + 0.5) / 4
+			value = math.floor((tonumber(value) or 0.5) * 100 + 0.5) / 100
 			_G.BetterUIDB = _G.BetterUIDB or {}
 			_G.BetterUIDB[self._key] = value
 			NS.DB = _G.BetterUIDB
@@ -1076,6 +1149,7 @@ local function BuildPanelUI(panel)
 		local value = tonumber((_G.BetterUIDB or {})[slider._key]) or 0.5
 		slider:SetValue(value)
 		SetLabel(value)
+		AttachSliderValueBox(slider, content, 0.25, 2, 2)
 		y = y - 50
 	end
 
