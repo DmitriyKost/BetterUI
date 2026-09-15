@@ -86,7 +86,7 @@ Optional movable on-screen performance text showing:
 
 ## Spell History
 
-Optional movable row showing icons for the player's recent player-initiated spell casts and item-use spells. Passive proc and damage-tick events are ignored. Entries remain visible for ten seconds; queue length and icon size are configurable. Recording can be toggled independently for the world, dungeons, raids, arenas, and battlegrounds. Unlocked mode previews empty icon slots for positioning.
+Optional movable row showing icons for the player's recent successful player-initiated spell casts and item-use spells. A cast is added only after `UNIT_SPELLCAST_SUCCEEDED`, so failed or interrupted casts never appear in the history. Each visible action (except the oldest one) shows the elapsed time since the previous action in `0.0` format. Passive proc and damage-tick events are ignored. Entries remain visible for ten seconds; queue length and icon size are configurable. Recording can be toggled independently for the world, dungeons, raids, arenas, and battlegrounds. Unlocked mode previews empty icon slots for positioning.
 
 ---
 

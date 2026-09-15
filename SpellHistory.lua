@@ -5,6 +5,7 @@ local DEFAULT_QUEUE_SIZE = 6
 local MIN_QUEUE_SIZE = 3
 local MAX_QUEUE_SIZE = 12
 local ENTRY_DURATION = 10
+local PENDING_CAST_TTL = 30
 local DEFAULT_ICON_SIZE = 38
 local MIN_ICON_SIZE = 24
 local MAX_ICON_SIZE = 64
@@ -18,6 +19,7 @@ local XUEN_SPELL_ID = 123904
 local Feature = {
 	entries = {},
 	icons = {},
+	pendingCasts = {},
 }
 
 local function IsSecret(value)
@@ -159,12 +161,12 @@ function Feature:CreateFrame()
 	local queueSize = GetQueueSize()
 	local frameWidth = (queueSize * iconSize) + ((queueSize - 1) * ICON_SPACING)
 	local frame = CreateFrame("Frame", nil, UIParent)
-	frame:SetSize(frameWidth, HANDLE_HEIGHT + iconSize)
+	frame:SetSize(frameWidth, iconSize)
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 
 	local handle = CreateFrame("Frame", nil, frame)
-	handle:SetPoint("TOPLEFT", frame, "TOPLEFT")
+	handle:SetPoint("BOTTOMLEFT", frame, "TOPLEFT")
 	handle:SetSize(frameWidth, HANDLE_HEIGHT)
 	handle:RegisterForDrag("LeftButton")
 	handle:SetScript("OnDragStart", function()
@@ -194,7 +196,18 @@ function Feature:CreateFrame()
 		icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
+		local timeText = slot:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		timeText:SetPoint("BOTTOM", slot, "BOTTOM", 0, 2)
+		timeText:SetTextColor(1, 1, 1)
+		local fontPath, fontSize = timeText:GetFont()
+		if fontPath and fontSize then
+			timeText:SetFont(fontPath, fontSize, "OUTLINE")
+		end
+		timeText:SetShadowOffset(0, 0)
+		timeText:Hide()
+
 		slot.icon = icon
+		slot.timeText = timeText
 		slot:Hide()
 		self.icons[i] = slot
 	end
@@ -216,7 +229,7 @@ function Feature:ApplyLayout()
 	local point, relativeTo, relativePoint, x, y = self.frame:GetPoint(1)
 	self.iconSize = iconSize
 	self.queueSize = queueSize
-	self.frame:SetSize(frameWidth, HANDLE_HEIGHT + iconSize)
+	self.frame:SetSize(frameWidth, iconSize)
 	self.frame.handle:SetWidth(frameWidth)
 	for i = 1, MAX_QUEUE_SIZE do
 		self.icons[i]:SetSize(iconSize, iconSize)
@@ -247,7 +260,6 @@ function Feature:Refresh()
 
 	local db = _G.BetterUIDB or NS.DB or {}
 	local locked = db.spellHistoryLocked and true or false
-	local startY = locked and 0 or -HANDLE_HEIGHT
 	local iconSize = self.iconSize or DEFAULT_ICON_SIZE
 	local queueSize = self.queueSize or DEFAULT_QUEUE_SIZE
 
@@ -255,16 +267,28 @@ function Feature:Refresh()
 		local slot = self.icons[i]
 		local entry = self.entries[i]
 		slot:ClearAllPoints()
-		slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", (i - 1) * (iconSize + ICON_SPACING), startY)
+		slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", (i - 1) * (iconSize + ICON_SPACING), 0)
 		if i <= queueSize and entry then
 			slot.icon:SetTexture(entry.icon)
 			slot.icon:SetAlpha(1)
+
+			local previousEntry = i < queueSize and self.entries[i + 1]
+			if previousEntry then
+				local elapsed = math.max(0, entry.createdAt - previousEntry.createdAt)
+				slot.timeText:SetText(("%.1f"):format(elapsed))
+				slot.timeText:Show()
+			else
+				slot.timeText:Hide()
+			end
+
 			slot:Show()
 		elseif i <= queueSize and not locked then
 			slot.icon:SetTexture(PREVIEW_ICON)
 			slot.icon:SetAlpha(0.35)
+			slot.timeText:Hide()
 			slot:Show()
 		else
+			slot.timeText:Hide()
 			slot:Hide()
 		end
 	end
@@ -319,8 +343,58 @@ function Feature:Clear()
 	for i = #self.entries, 1, -1 do
 		self.entries[i] = nil
 	end
+	for castGUID in pairs(self.pendingCasts) do
+		self.pendingCasts[castGUID] = nil
+	end
 	self:StopExpirationTimer()
 	self:Refresh()
+end
+
+function Feature:PrunePendingCasts(now)
+	now = now or GetTime()
+	for castGUID, pending in pairs(self.pendingCasts) do
+		if now - pending.createdAt > PENDING_CAST_TTL then
+			self.pendingCasts[castGUID] = nil
+		end
+	end
+end
+
+function Feature:TrackPendingCast(castGUID, spellID)
+	if not self._enabled or IsSecret(castGUID) or IsSecret(spellID) then
+		return
+	end
+	if not CanRecordHere() or not castGUID or not spellID then
+		return
+	end
+
+	local now = GetTime()
+	self:PrunePendingCasts(now)
+	self.pendingCasts[castGUID] = {
+		spellID = spellID,
+		createdAt = now,
+	}
+end
+
+function Feature:ResolvePendingCast(castGUID, spellID, succeeded)
+	if IsSecret(castGUID) or not castGUID then
+		return
+	end
+
+	local pending = self.pendingCasts[castGUID]
+	self.pendingCasts[castGUID] = nil
+	if not succeeded or not self._enabled then
+		return
+	end
+
+	if pending then
+		self:RecordCast(castGUID, pending.spellID)
+		return
+	end
+
+	-- Xuen has historically needed a SUCCEEDED-only fallback on some clients.
+	if not IsSecret(spellID) and IsXuenSpell(spellID) then
+		self:RecordCast(castGUID, XUEN_SPELL_ID)
+	end
 end
 
 function Feature:RecordCast(castGUID, spellID)
@@ -339,7 +413,11 @@ function Feature:RecordCast(castGUID, spellID)
 		end
 	end
 
-	spellID = DISPLAY_SPELL_ALIASES[spellID] or spellID
+	if IsXuenSpell(spellID) then
+		spellID = XUEN_SPELL_ID
+	else
+		spellID = DISPLAY_SPELL_ALIASES[spellID] or spellID
+	end
 	local now = GetTime()
 	local newest = self.entries[1]
 	if spellID == XUEN_SPELL_ID and newest and newest.spellID == spellID and now - newest.createdAt < 1 then
@@ -361,30 +439,6 @@ function Feature:RecordCast(castGUID, spellID)
 
 	self:Refresh()
 	self:ScheduleExpiration()
-end
-
-function Feature:RecordXuenFallback(castGUID, spellID)
-	if not self._enabled or IsSecret(castGUID) or IsSecret(spellID) then
-		return
-	end
-	if castGUID and IsXuenSpell(spellID) then
-		self:RecordCast(castGUID, XUEN_SPELL_ID)
-	end
-end
-
-function Feature:ForgetCast(castGUID)
-	if not self._enabled or IsSecret(castGUID) or not castGUID then
-		return
-	end
-
-	for i = #self.entries, 1, -1 do
-		if self.entries[i].castGUID == castGUID then
-			table.remove(self.entries, i)
-			self:Refresh()
-			self:ScheduleExpiration()
-			return
-		end
-	end
 end
 
 function Feature:Enable()
@@ -440,16 +494,12 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
 	if event == "UNIT_SPELLCAST_SENT" then
 		local _, _, castGUID, spellID = ...
-		Feature:RecordCast(castGUID, spellID)
+		Feature:TrackPendingCast(castGUID, spellID)
 		return
 	end
 
 	local _, castGUID, spellID = ...
-	if event == "UNIT_SPELLCAST_SUCCEEDED" then
-		Feature:RecordXuenFallback(castGUID, spellID)
-		return
-	end
-	Feature:ForgetCast(castGUID)
+	Feature:ResolvePendingCast(castGUID, spellID, event == "UNIT_SPELLCAST_SUCCEEDED")
 end)
 
 NS.Features[FEATURE_NAME] = Feature

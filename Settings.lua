@@ -510,7 +510,7 @@ local function BuildPanelUI(panel)
 		panel._buiSpellHistoryEnable = CreateCheckbox(
 			content,
 			"Enable spell history",
-			"Shows the player's six most recent player-initiated spell casts and item-use spells.",
+			"Shows recent successful player-initiated spell casts and item-use spells, with time between actions.",
 			"enableSpellHistory",
 			y
 		)
