@@ -14,6 +14,7 @@ RoguePoisonReminder.lua
 HealthBar.lua
 Performance.lua
 SpellHistory.lua
+PlayerCastBar.lua
 ActionBarBorderHider.lua
 ActionBarMacroTextHider.lua
 CharSecondaryStatRatings.lua

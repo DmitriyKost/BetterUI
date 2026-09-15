@@ -24,6 +24,10 @@ local defaults = {
 	roguePoisonReminderLocked = false,
 
 	enablePerformanceMonitor = false,
+	enablePlayerCastBar = true,
+	playerCastBarWidth = 240,
+	playerCastBarHeight = 18,
+	playerCastBarDisableGlowAnimations = false,
 	enableSpellHistory = false,
 	spellHistoryLocked = false,
 	spellHistoryIconSize = 38,
@@ -125,6 +129,7 @@ function NS.ApplySettings()
 	ApplyFeature("RoguePoisonReminder", db.enableRoguePoisonReminder)
 	ApplyFeature("Performance", db.enablePerformanceMonitor)
 	ApplyFeature("SpellHistory", db.enableSpellHistory)
+	ApplyFeature("PlayerCastBar", db.enablePlayerCastBar)
 	ApplyFeature("ActionBarBorders", true)
 	ApplyFeature("ActionBarMacroText", true)
 	ApplyFeature("ActionBarClickThrough", true)

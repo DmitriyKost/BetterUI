@@ -380,6 +380,82 @@ local function BuildPanelUI(panel)
 	end
 
 	do
+		local section = CreateCollapsibleSection(panel, root, "playerCastBar", "Player Cast Bar")
+		local content = section.Content
+		local y = -4
+
+		panel._buiPlayerCastBarEnable = CreateCheckbox(
+			content,
+			"Enable player cast bar styling",
+			"Uses a rectangular player cast bar with the spell name and cast time inside.",
+			"enablePlayerCastBar",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiPlayerCastBarEnable
+		y = y - 30
+
+		panel._buiPlayerCastBarDisableGlows = CreateCheckbox(
+			content,
+			"Disable glow animations",
+			"Hides nonessential cast, channel, completion, interrupt, and empower glow effects while retaining the moving spark.",
+			"playerCastBarDisableGlowAnimations",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiPlayerCastBarDisableGlows
+		y = y - 42
+
+		local function CreateSizeSlider(key, label, minimum, maximum, step, defaultValue)
+			local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
+			slider:SetPoint("TOPLEFT", 32, y)
+			slider:SetMinMaxValues(minimum, maximum)
+			slider:SetValueStep(step)
+			slider:SetObeyStepOnDrag(true)
+			slider:SetWidth(240)
+			slider.Low:SetText(tostring(minimum))
+			slider.High:SetText(tostring(maximum))
+			slider._key = key
+
+			local function SetLabel(value)
+				value = math.floor((tonumber(value) or defaultValue) + 0.5)
+				slider.Text:SetText(('%s: %d'):format(label, value))
+			end
+
+			slider:SetScript("OnValueChanged", function(self, value)
+				value = math.floor((tonumber(value) or defaultValue) + 0.5)
+				_G.BetterUIDB = _G.BetterUIDB or {}
+				_G.BetterUIDB[self._key] = value
+				NS.DB = _G.BetterUIDB
+				SetLabel(value)
+				if NS.FireSettingChanged then
+					NS.FireSettingChanged()
+				end
+			end)
+
+			local value = tonumber((_G.BetterUIDB or {})[key]) or defaultValue
+			slider:SetValue(value)
+			SetLabel(value)
+			y = y - 50
+			return slider, SetLabel
+		end
+
+		panel._buiPlayerCastBarWidth, panel._buiPlayerCastBarSetWidthLabel =
+			CreateSizeSlider("playerCastBarWidth", "Width", 150, 500, 10, 240)
+		panel._buiPlayerCastBarHeight, panel._buiPlayerCastBarSetHeightLabel =
+			CreateSizeSlider("playerCastBarHeight", "Height", 10, 40, 1, 18)
+
+		panel._buiRefreshPlayerCastBarEnabledState = function()
+			local enabled = (_G.BetterUIDB or {}).enablePlayerCastBar and true or false
+			SetCheckboxEnabled(panel._buiPlayerCastBarDisableGlows, enabled)
+			SetSliderEnabled(panel._buiPlayerCastBarWidth, enabled)
+			SetSliderEnabled(panel._buiPlayerCastBarHeight, enabled)
+		end
+		panel._buiPlayerCastBarEnable:HookScript("OnClick", panel._buiRefreshPlayerCastBarEnabledState)
+		panel._buiRefreshPlayerCastBarEnabledState()
+		section:SetContentHeight(-y + 4)
+	end
+
+	do
 		local section = CreateCollapsibleSection(panel, root, "spellHistory", "Spell History")
 		local content = section.Content
 		local y = -4
@@ -1005,6 +1081,16 @@ local function BuildPanelUI(panel)
 			self._buiSpellHistoryQueueSize:SetValue(value)
 			self._buiSpellHistorySetQueueSizeLabel(value)
 		end
+		if self._buiPlayerCastBarWidth then
+			local value = tonumber(_G.BetterUIDB[self._buiPlayerCastBarWidth._key]) or 240
+			self._buiPlayerCastBarWidth:SetValue(value)
+			self._buiPlayerCastBarSetWidthLabel(value)
+		end
+		if self._buiPlayerCastBarHeight then
+			local value = tonumber(_G.BetterUIDB[self._buiPlayerCastBarHeight._key]) or 18
+			self._buiPlayerCastBarHeight:SetValue(value)
+			self._buiPlayerCastBarSetHeightLabel(value)
+		end
 		for i = 1, #self._buiActionBarChecks do
 			local cb = self._buiActionBarChecks[i]
 			local ids = ParseActionBarIDs(_G.BetterUIDB[cb._key])
@@ -1021,6 +1107,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshSpellHistoryEnabledState then
 			self._buiRefreshSpellHistoryEnabledState()
+		end
+		if self._buiRefreshPlayerCastBarEnabledState then
+			self._buiRefreshPlayerCastBarEnabledState()
 		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()
