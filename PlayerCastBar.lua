@@ -95,6 +95,33 @@ local function IsStructuralUpdateBlocked(frame)
 	return InCombatLockdown() or IsEditModeActive() or (frame and frame.reverseChanneling)
 end
 
+local function CaptureFadeAnimationState(frame)
+	local state = {}
+
+	if frame.FadeOutAnim then
+		for _, animation in ipairs({ frame.FadeOutAnim:GetAnimations() }) do
+			state[#state + 1] = { animation = animation, duration = animation:GetDuration() }
+		end
+	end
+
+	if frame.HoldFadeOutAnim then
+		for _, animation in ipairs({ frame.HoldFadeOutAnim:GetAnimations() }) do
+			if animation:GetOrder() == 2 then
+				state[#state + 1] = { animation = animation, duration = animation:GetDuration() }
+			end
+		end
+	end
+
+	return state
+end
+
+local function SetFadeAnimationDurations(state, duration)
+	for i = 1, #(state or {}) do
+		local saved = state[i]
+		saved.animation:SetDuration(duration or saved.duration)
+	end
+end
+
 local function CaptureState(frame)
 	if Feature._savedState then
 		return
@@ -115,6 +142,7 @@ local function CaptureState(frame)
 		width = frame:GetWidth(),
 		height = frame:GetHeight(),
 		playCastFX = frame.playCastFX,
+		fadeAnimations = CaptureFadeAnimationState(frame),
 
 		hiddenRegionShown = hiddenRegionShown,
 
@@ -133,6 +161,9 @@ local function CaptureState(frame)
 		borderMaskHeight = frame.BorderMask and frame.BorderMask:GetHeight(),
 
 		fillHeight = frame:GetStatusBarTexture() and frame:GetStatusBarTexture():GetHeight(),
+
+		flashVertexColor = frame.Flash and { frame.Flash:GetVertexColor() },
+		interruptGlowVertexColor = frame.InterruptGlow and { frame.InterruptGlow:GetVertexColor() },
 
 		castTimePoints = frame.CastTimeText and CapturePoints(frame.CastTimeText),
 
@@ -202,22 +233,22 @@ local function EnsureCustomRegions(frame)
 	local top = Feature._edges[1]
 	top:SetPoint("TOPLEFT", frame, "TOPLEFT", -1, 1)
 	top:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 1)
-	top:SetHeight(BORDER_SIZE)
+	top:SetHeight(BORDER_SIZE + 1)
 
 	local bottom = Feature._edges[2]
 	bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -1, -1)
 	bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1, -1)
-	bottom:SetHeight(BORDER_SIZE)
+	bottom:SetHeight(BORDER_SIZE + 1)
 
 	local left = Feature._edges[3]
 	left:SetPoint("TOPLEFT", frame, "TOPLEFT", -1, 1)
 	left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -1, -1)
-	left:SetWidth(BORDER_SIZE)
+	left:SetWidth(BORDER_SIZE + 1)
 
 	local right = Feature._edges[4]
 	right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 1)
 	right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1, -1)
-	right:SetWidth(BORDER_SIZE)
+	right:SetWidth(BORDER_SIZE + 1)
 end
 
 local function SetCustomRegionsShown(shown)
@@ -235,6 +266,21 @@ local function FitNativeFill(frame, height)
 
 	if texture then
 		texture:SetHeight(height)
+	end
+end
+
+local function SuppressAdditiveBorderGlow(region)
+	if not region then
+		return
+	end
+
+	local _, _, _, alpha = region:GetVertexColor()
+	region:SetVertexColor(0, 0, 0, alpha or 1)
+end
+
+local function RestoreVertexColor(region, color)
+	if region and color then
+		region:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
 	end
 end
 
@@ -311,6 +357,8 @@ local function ApplyRuntimeCosmetics(frame)
 	end
 
 	frame.playCastFX = false
+	SuppressAdditiveBorderGlow(frame.Flash)
+	SuppressAdditiveBorderGlow(frame.InterruptGlow)
 
 	if frame.CastTimeText then
 		frame.CastTimeText:Show()
@@ -400,6 +448,7 @@ function Feature:ApplyStyle()
 	-- Do not call PlayerCastingBarFrame mixin methods that mutate
 	-- Blizzard Lua state, and do not invoke managed-layout code.
 	frame:SetSize(width, height)
+	SetFadeAnimationDurations(self._savedState.fadeAnimations, 0.001)
 
 	ApplyStructuralLayout(frame, width, height)
 	ApplyRuntimeCosmetics(frame)
@@ -415,6 +464,9 @@ function Feature:RestoreStyle(preserveSavedState)
 
 	SetCustomRegionsShown(false)
 	frame.playCastFX = saved.playCastFX
+	SetFadeAnimationDurations(saved.fadeAnimations)
+	RestoreVertexColor(frame.Flash, saved.flashVertexColor)
+	RestoreVertexColor(frame.InterruptGlow, saved.interruptGlowVertexColor)
 
 	if saved.width and saved.height then
 		frame:SetSize(saved.width, saved.height)
