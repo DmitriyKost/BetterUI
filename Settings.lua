@@ -387,23 +387,12 @@ local function BuildPanelUI(panel)
 		panel._buiPlayerCastBarEnable = CreateCheckbox(
 			content,
 			"Enable player cast bar styling",
-			"Uses a rectangular player cast bar with the spell name and cast time inside.",
+			"Uses a clean rectangular player cast bar with readable text and reduced visual effects.",
 			"enablePlayerCastBar",
 			y
 		)
 		panel._buiChecks[#panel._buiChecks + 1] = panel._buiPlayerCastBarEnable
-		y = y - 30
-
-		panel._buiPlayerCastBarDisableGlows = CreateCheckbox(
-			content,
-			"Disable glow animations",
-			"Hides nonessential cast, channel, completion, interrupt, and empower glow effects while retaining the moving spark.",
-			"playerCastBarDisableGlowAnimations",
-			y,
-			32
-		)
-		panel._buiChecks[#panel._buiChecks + 1] = panel._buiPlayerCastBarDisableGlows
-		y = y - 42
+		y = y - 50
 
 		local function CreateSizeSlider(key, label, minimum, maximum, step, defaultValue)
 			local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
@@ -446,7 +435,6 @@ local function BuildPanelUI(panel)
 
 		panel._buiRefreshPlayerCastBarEnabledState = function()
 			local enabled = (_G.BetterUIDB or {}).enablePlayerCastBar and true or false
-			SetCheckboxEnabled(panel._buiPlayerCastBarDisableGlows, enabled)
 			SetSliderEnabled(panel._buiPlayerCastBarWidth, enabled)
 			SetSliderEnabled(panel._buiPlayerCastBarHeight, enabled)
 		end

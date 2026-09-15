@@ -27,7 +27,6 @@ local defaults = {
 	enablePlayerCastBar = true,
 	playerCastBarWidth = 240,
 	playerCastBarHeight = 18,
-	playerCastBarDisableGlowAnimations = false,
 	enableCooldownManager = true,
 	cooldownManagerShowTenths = true,
 	cooldownManagerWindwalkerHotJS = true,
@@ -80,6 +79,7 @@ f:SetScript("OnEvent", function(_, _, addon)
 	end
 
 	_G.BetterUIDB = _G.BetterUIDB or {}
+	_G.BetterUIDB.playerCastBarDisableGlowAnimations = nil
 
 	for k, v in pairs(defaults) do
 		if _G.BetterUIDB[k] == nil then

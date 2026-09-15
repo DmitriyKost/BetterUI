@@ -36,31 +36,6 @@ local nativeLookRegions = {
 	"TextBorder",
 }
 
-local glowRegions = {
-	"BaseGlow",
-	"ChargeFlash",
-	"ChargeGlow",
-	"ChannelShadow",
-	"CraftGlow",
-	"EnergyGlow",
-	"Flakes01",
-	"Flakes02",
-	"Flakes03",
-	"Flash",
-	"InterruptGlow",
-	"Shine",
-	"Sparkles01",
-	"Sparkles02",
-	"StandardGlow",
-	"WispGlow",
-}
-
-local finishAnimationKeys = {
-	"StandardFinish",
-	"CraftingFinish",
-	"ChannelFinish",
-}
-
 local function Clamp(value, minimum, maximum, fallback)
 	value = tonumber(value) or fallback
 	return math.max(minimum, math.min(maximum, value))
@@ -105,7 +80,15 @@ local function SetRegionShown(region, shown)
 end
 
 local function IsEditModeActive()
-	return EditModeManagerFrame and EditModeManagerFrame:IsShown()
+	if not EditModeManagerFrame then
+		return false
+	end
+
+	if EditModeManagerFrame.IsEditModeActive then
+		return EditModeManagerFrame:IsEditModeActive()
+	end
+
+	return EditModeManagerFrame:IsShown()
 end
 
 local function IsStructuralUpdateBlocked(frame)
@@ -131,6 +114,7 @@ local function CaptureState(frame)
 	Feature._savedState = {
 		width = frame:GetWidth(),
 		height = frame:GetHeight(),
+		playCastFX = frame.playCastFX,
 
 		hiddenRegionShown = hiddenRegionShown,
 
@@ -178,6 +162,7 @@ local function RefreshSavedNativeStateAfterEditMode(frame)
 	-- reapplies its cosmetics.
 	saved.width = frame:GetWidth()
 	saved.height = frame:GetHeight()
+	saved.playCastFX = frame.playCastFX
 
 	if frame.Text then
 		saved.textPoints = CapturePoints(frame.Text)
@@ -253,144 +238,6 @@ local function FitNativeFill(frame, height)
 	end
 end
 
-local function GlowAnimationsDisabled()
-	local db = _G.BetterUIDB or NS.DB or {}
-	return db.playerCastBarDisableGlowAnimations and true or false
-end
-
-local function CaptureGlowRegionState(region)
-	if not region then
-		return
-	end
-
-	Feature._glowRegionState = Feature._glowRegionState or setmetatable({}, { __mode = "k" })
-
-	if Feature._glowRegionState[region] then
-		return
-	end
-
-	Feature._glowRegionState[region] = {
-		alpha = region:GetAlpha(),
-		shown = region:IsShown(),
-		vertexColor = { region:GetVertexColor() },
-	}
-end
-
-local function SuppressGlowRegion(region)
-	if not region then
-		return
-	end
-
-	CaptureGlowRegionState(region)
-
-	local red, green, blue = region:GetVertexColor()
-
-	-- Animation Alpha tracks can overwrite SetAlpha(), while some FX
-	-- templates explicitly Show() their targets when playback starts.
-	-- Keep both alpha channels at zero and hide the target.
-	region:SetVertexColor(red, green, blue, 0)
-	region:SetAlpha(0)
-	region:Hide()
-end
-
-local function RestoreGlowRegions()
-	if not Feature._glowRegionState then
-		return
-	end
-
-	for region, state in pairs(Feature._glowRegionState) do
-		local color = state.vertexColor
-
-		region:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
-
-		region:SetAlpha(state.alpha or 1)
-		region:SetShown(state.shown)
-	end
-
-	wipe(Feature._glowRegionState)
-end
-
-local function StopGlowAnimationGroup(animation)
-	if animation and animation:IsPlaying() then
-		animation:Stop()
-	end
-end
-
-local function StopGlowAnimations(frame)
-	-- Do not stop FadeOutAnim/HoldFadeOutAnim: those are responsible for
-	-- the normal lifetime of the interrupted/completed cast bar.
-	StopGlowAnimationGroup(frame.FlashAnim)
-	StopGlowAnimationGroup(frame.FlashLoopingAnim)
-	StopGlowAnimationGroup(frame.StageFlash)
-	StopGlowAnimationGroup(frame.StageFinish)
-	StopGlowAnimationGroup(frame.InterruptGlowAnim)
-
-	for i = 1, #finishAnimationKeys do
-		StopGlowAnimationGroup(frame[finishAnimationKeys[i]])
-	end
-
-	local stagePips = frame.StagePips or {}
-
-	for i = 1, #stagePips do
-		StopGlowAnimationGroup(stagePips[i].StageAnim)
-	end
-
-	local stageTiers = frame.StageTiers or {}
-
-	for i = 1, #stageTiers do
-		StopGlowAnimationGroup(stageTiers[i].FlashAnim)
-		StopGlowAnimationGroup(stageTiers[i].FinishAnim)
-	end
-end
-
-local function SuppressGlowAnimations(frame)
-	if not GlowAnimationsDisabled() then
-		RestoreGlowRegions()
-		return
-	end
-
-	-- Stop the actual animation groups first. Merely changing texture
-	-- vertex alpha is insufficient because Blizzard's Alpha animation
-	-- tracks continue to drive the target regions while playing.
-	StopGlowAnimations(frame)
-
-	for i = 1, #glowRegions do
-		SuppressGlowRegion(frame[glowRegions[i]])
-	end
-
-	local stagePips = frame.StagePips or {}
-
-	for i = 1, #stagePips do
-		local pip = stagePips[i]
-
-		SuppressGlowRegion(pip.PipGlow)
-		SuppressGlowRegion(pip.FlakesBottom)
-		SuppressGlowRegion(pip.FlakesTop)
-		SuppressGlowRegion(pip.FlakesTop02)
-		SuppressGlowRegion(pip.FlakesBottom02)
-	end
-
-	local stageTiers = frame.StageTiers or {}
-
-	for i = 1, #stageTiers do
-		SuppressGlowRegion(stageTiers[i].Glow)
-	end
-end
-
-local function FontHasOutline(region)
-	if not region then
-		return false
-	end
-
-	local _, _, flags = region:GetFont()
-
-	if not flags or flags == "" then
-		return false
-	end
-
-	return flags:find("OUTLINE", 1, true) ~= nil
-end
-
 local function SetOutlinedFontObject(region, fontObject)
 	if not region or not fontObject then
 		return
@@ -455,13 +302,15 @@ local function ApplyRuntimeCosmetics(frame)
 	-- This matters when the feature is enabled while combat/Edit Mode blocks
 	-- the structural apply: otherwise RestoreStyle() could later restore our
 	-- own partially-applied cosmetics as if they were Blizzard defaults.
-	if not Feature._enabled or not frame or not Feature._savedState then
+	if not Feature._enabled or not frame or not Feature._savedState or IsEditModeActive() then
 		return
 	end
 
 	for i = 1, #hiddenRegions do
 		SetRegionShown(frame[hiddenRegions[i]], false)
 	end
+
+	frame.playCastFX = false
 
 	if frame.CastTimeText then
 		frame.CastTimeText:Show()
@@ -475,7 +324,6 @@ local function ApplyRuntimeCosmetics(frame)
 	ApplyTextLayout(frame, width)
 
 	FitNativeFill(frame, frame:GetHeight())
-	SuppressGlowAnimations(frame)
 end
 
 local function ApplyStructuralLayout(frame, width, height)
@@ -557,7 +405,7 @@ function Feature:ApplyStyle()
 	ApplyRuntimeCosmetics(frame)
 end
 
-function Feature:RestoreStyle()
+function Feature:RestoreStyle(preserveSavedState)
 	local frame = PlayerCastingBarFrame
 	local saved = self._savedState
 
@@ -565,8 +413,8 @@ function Feature:RestoreStyle()
 		return
 	end
 
-	RestoreGlowRegions()
 	SetCustomRegionsShown(false)
+	frame.playCastFX = saved.playCastFX
 
 	if saved.width and saved.height then
 		frame:SetSize(saved.width, saved.height)
@@ -620,7 +468,9 @@ function Feature:RestoreStyle()
 		FitNativeFill(frame, saved.fillHeight)
 	end
 
-	self._savedState = nil
+	if not preserveSavedState then
+		self._savedState = nil
+	end
 end
 
 local function QueueApply()
@@ -673,6 +523,19 @@ runtimeDriver:SetScript("OnUpdate", function(self)
 		return
 	end
 
+	local frame = PlayerCastingBarFrame
+
+	if frame and not IsStructuralUpdateBlocked(frame) then
+		if Feature._pendingDisable then
+			Feature:Disable()
+			return
+		end
+
+		if Feature._pendingApply then
+			QueueApply()
+		end
+	end
+
 	local remaining = Feature._runtimeRefreshFrames or 0
 
 	if remaining <= 0 then
@@ -681,7 +544,6 @@ runtimeDriver:SetScript("OnUpdate", function(self)
 	end
 
 	ApplyRuntimeCosmetics(PlayerCastingBarFrame)
-
 	remaining = remaining - 1
 	Feature._runtimeRefreshFrames = remaining
 
@@ -689,53 +551,6 @@ runtimeDriver:SetScript("OnUpdate", function(self)
 		self:Hide()
 	end
 end)
-
-local function NearlyEqual(a, b, tolerance)
-	tolerance = tolerance or 0.25
-	return math.abs((a or 0) - (b or 0)) <= tolerance
-end
-
-local function TextLayoutNeedsRefresh(frame)
-	if not frame or not frame.Text then
-		return false
-	end
-
-	local point, relativeTo, relativePoint, x, y = frame.Text:GetPoint(1)
-
-	if
-		point ~= "TOPLEFT"
-		or relativeTo ~= frame
-		or relativePoint ~= "TOPLEFT"
-		or not NearlyEqual(x, 5)
-		or not NearlyEqual(y, 0)
-	then
-		return true
-	end
-
-	if not FontHasOutline(frame.Text) then
-		return true
-	end
-
-	if frame.CastTimeText and not FontHasOutline(frame.CastTimeText) then
-		return true
-	end
-
-	return false
-end
-
-local function NativeLayoutNeedsRefresh(frame)
-	if not frame then
-		return false
-	end
-
-	local width, height = GetDesiredSize()
-
-	if not NearlyEqual(frame:GetWidth(), width) or not NearlyEqual(frame:GetHeight(), height) then
-		return true
-	end
-
-	return TextLayoutNeedsRefresh(frame)
-end
 
 local function WarnCombatEditModeDeferral()
 	if Feature._combatEditModeWarningShown then
@@ -755,14 +570,40 @@ local function WarnCombatEditModeDeferral()
 	end
 end
 
+local function WarnCombatSettingsDeferral()
+	if Feature._combatSettingsWarningShown then
+		return
+	end
+
+	Feature._combatSettingsWarningShown = true
+
+	local message = "|cff33ff99BetterUI|r: Player Cast Bar setting changes "
+		.. "are deferred until combat ends."
+
+	if DEFAULT_CHAT_FRAME then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	else
+		print(message)
+	end
+end
+
 local function RecoverAfterEditMode(frame)
 	if not frame then
 		return
 	end
 
-	-- Edit Mode may have called SetLook(), which rewrites native dimensions,
-	-- text anchors/fonts and look-controlled region visibility.
-	RefreshSavedNativeStateAfterEditMode(frame)
+	if Feature._nativeStateExposedForEditMode then
+		-- Edit Mode may have called SetLook(), which rewrites native dimensions,
+		-- text anchors/fonts and look-controlled region visibility. Only capture
+		-- when BetterUI restored native state before Edit Mode began.
+		RefreshSavedNativeStateAfterEditMode(frame)
+		Feature._nativeStateExposedForEditMode = false
+	end
+
+	if Feature._pendingDisable then
+		Feature:Disable()
+		return
+	end
 
 	-- These operations are already used by BetterUI during normal combat
 	-- spellcast events and do not touch Blizzard mixin state or managed layout.
@@ -772,7 +613,7 @@ local function RecoverAfterEditMode(frame)
 	if IsStructuralUpdateBlocked(frame) then
 		Feature._pendingApply = true
 
-		if InCombatLockdown() and NativeLayoutNeedsRefresh(frame) then
+		if InCombatLockdown() then
 			WarnCombatEditModeDeferral()
 		end
 
@@ -782,96 +623,26 @@ local function RecoverAfterEditMode(frame)
 	QueueApply()
 end
 
-local function StartEditModeWatcher()
-	if Feature._editModeTicker then
+local function OnEditModeEnter()
+	if not Feature._enabled then
 		return
 	end
 
-	Feature._editModeShown = IsEditModeActive() and true or false
-
-	Feature._editModeTicker = C_Timer.NewTicker(0.25, function()
-		if not Feature._enabled then
-			return
-		end
-
-		local shown = IsEditModeActive() and true or false
-		local wasShown = Feature._editModeShown
-
-		if shown ~= wasShown then
-			Feature._editModeShown = shown
-
-			if shown and InCombatLockdown() then
-				WarnCombatEditModeDeferral()
-			end
-
-			-- Do not touch PlayerCastingBarFrame while Blizzard owns the
-			-- Edit Mode update stack. Once Edit Mode closes, restore all
-			-- combat-safe cosmetics immediately and defer only structural
-			-- sizing/layout work if combat still blocks it.
-			if wasShown and not shown then
-				local frame = PlayerCastingBarFrame
-
-				if Feature._pendingDisable then
-					Feature:Disable()
-					return
-				end
-
-				RecoverAfterEditMode(frame)
-			end
-
-			return
-		end
-
-		if shown then
-			return
-		end
-
-		local frame = PlayerCastingBarFrame
-
-		if not frame then
-			return
-		end
-
-		local blocked = IsStructuralUpdateBlocked(frame)
-
-		-- Drain deferred lifecycle work independently of layout drift. This
-		-- avoids relying on a spellcast event or a fixed post-empower delay.
-		if Feature._pendingDisable and not blocked then
-			Feature:Disable()
-			return
-		end
-
-		if Feature._pendingApply and not blocked then
-			QueueApply()
-			return
-		end
-
-		-- Blizzard SetLook() hard-resets the player bar to its native
-		-- CLASSIC/UNITFRAME geometry. Detect that native drift instead of
-		-- hooking SetLook(), which previously tainted Edit Mode execution.
-		if NativeLayoutNeedsRefresh(frame) then
-			if blocked then
-				Feature._pendingApply = true
-
-				-- FontString anchors are native region state; keep the spell
-				-- name/timer aligned even if frame sizing must wait.
-				local width = GetDesiredSize()
-				ApplyTextLayout(frame, width)
-			else
-				QueueApply()
-			end
-		end
-	end)
+	if InCombatLockdown() then
+		Feature._nativeStateExposedForEditMode = false
+		WarnCombatEditModeDeferral()
+	elseif Feature._savedState then
+		-- Edit Mode must operate on Blizzard's state, not BetterUI's styled
+		-- state, or the exit snapshot becomes self-referential.
+		Feature:RestoreStyle(true)
+		Feature._nativeStateExposedForEditMode = true
+	end
 end
 
-local function StopEditModeWatcher()
-	if not Feature._editModeTicker then
-		return
+local function OnEditModeExit()
+	if Feature._enabled then
+		RecoverAfterEditMode(PlayerCastingBarFrame)
 	end
-
-	Feature._editModeTicker:Cancel()
-	Feature._editModeTicker = nil
-	Feature._editModeShown = nil
 end
 
 function Feature:TryAttach()
@@ -884,12 +655,18 @@ function Feature:TryAttach()
 end
 
 function Feature:Enable()
+	local wasEnabled = self._enabled
+	local wasPendingDisable = self._pendingDisable
+
 	self._enabled = true
 	self._pendingDisable = false
 	self._combatEditModeWarningShown = false
 
+	if InCombatLockdown() and (not wasEnabled or wasPendingDisable) then
+		WarnCombatSettingsDeferral()
+	end
+
 	self:TryAttach()
-	StartEditModeWatcher()
 
 	if not self._settingListenerAdded then
 		self._settingListenerAdded = true
@@ -911,6 +688,11 @@ function Feature:Disable()
 
 	if IsStructuralUpdateBlocked(frame) then
 		self._pendingDisable = true
+
+		if InCombatLockdown() then
+			WarnCombatSettingsDeferral()
+		end
+
 		return
 	end
 
@@ -918,17 +700,33 @@ function Feature:Disable()
 	self._pendingApply = false
 	self._pendingDisable = false
 	self._combatEditModeWarningShown = false
+	self._combatSettingsWarningShown = false
 	self._runtimeRefreshFrames = 0
 
 	runtimeDriver:Hide()
-	StopEditModeWatcher()
+	self._nativeStateExposedForEditMode = false
 
 	self:RestoreStyle()
 end
 
 local function HandleSpellcastEvent(event)
-	-- Runtime cosmetics are repeated for a few rendered frames so Blizzard
-	-- animation/event handlers cannot briefly restore interrupt/finish glow.
+	if
+		event == "UNIT_SPELLCAST_START"
+		or event == "UNIT_SPELLCAST_CHANNEL_START"
+		or event == "UNIT_SPELLCAST_EMPOWER_START"
+	then
+		if InCombatLockdown() then
+			Feature._pendingApply = true
+		else
+			QueueApply()
+		end
+
+		ArmRuntimeRefresh(RUNTIME_REFRESH_FRAMES)
+		return
+	end
+
+	-- Repeat runtime cosmetics briefly after stop events because Blizzard may
+	-- update text and child-region layout later in the same event cycle.
 	if
 		event == "UNIT_SPELLCAST_INTERRUPTED"
 		or event == "UNIT_SPELLCAST_FAILED"
@@ -942,6 +740,9 @@ local function HandleSpellcastEvent(event)
 
 	ArmRuntimeRefresh(RUNTIME_REFRESH_FRAMES)
 end
+
+EventRegistry:RegisterCallback("EditMode.Enter", OnEditModeEnter, eventFrame)
+EventRegistry:RegisterCallback("EditMode.Exit", OnEditModeExit, eventFrame)
 
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
@@ -980,6 +781,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 
 	if event == "PLAYER_REGEN_ENABLED" then
 		Feature._combatEditModeWarningShown = false
+		Feature._combatSettingsWarningShown = false
 
 		if Feature._pendingDisable then
 			Feature:Disable()

@@ -66,7 +66,7 @@ Adds absorb value to health bars (requires Interface->Display->Status Text to be
 
 ## Player Cast Bar
 
-Optional rectangular styling for Blizzard's player cast bar. The spell name and remaining cast time are placed inside the bar, the spell icon and ornate border are removed, and width and height can be adjusted independently. Nonessential glow animations can be disabled while retaining the moving spark and empowered stage divisions. Position and overall scale remain controlled by Blizzard Edit Mode.
+Optional rectangular styling for Blizzard's player cast bar. The spell name and remaining cast time are placed inside the bar, the spell icon and ornate border are removed, and width and height can be adjusted independently. Blizzard's optional cast FX are reduced while native fill, completion, interruption, moving-spark, and empowered-stage behavior remain intact. Position and overall scale remain controlled by Blizzard Edit Mode.
 
 ---
 
