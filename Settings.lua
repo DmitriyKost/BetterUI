@@ -456,6 +456,53 @@ local function BuildPanelUI(panel)
 	end
 
 	do
+		local section = CreateCollapsibleSection(panel, root, "cooldownManager", "Cooldown Manager")
+		local content = section.Content
+		local y = -4
+
+		panel._buiCooldownManagerEnable = CreateCheckbox(
+			content,
+			"Enable Cooldown Manager tweaks",
+			"Small improvements to Blizzard's tracked buff cooldown display.",
+			"enableCooldownManager",
+			y
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiCooldownManagerEnable
+		y = y - 30
+
+		panel._buiCooldownManagerTenths = CreateCheckbox(
+			content,
+			"Show tenths below 10 seconds",
+			"Shows tenths when a tracked buff has less than 10 seconds remaining.",
+			"cooldownManagerShowTenths",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiCooldownManagerTenths
+		y = y - 30
+
+		panel._buiCooldownManagerWindwalker = CreateCheckbox(
+			content,
+			"Windwalker: fix Heart of the Jade Serpent timers",
+			"Corrects overlapping Heart of the Jade Serpent timers from regular triggers, Unity Within, and Zenith. Only active while Windwalker is the current specialization.",
+			"cooldownManagerWindwalkerHotJS",
+			y,
+			32
+		)
+		panel._buiChecks[#panel._buiChecks + 1] = panel._buiCooldownManagerWindwalker
+		y = y - 30
+
+		panel._buiRefreshCooldownManagerEnabledState = function()
+			local enabled = (_G.BetterUIDB or {}).enableCooldownManager and true or false
+			SetCheckboxEnabled(panel._buiCooldownManagerTenths, enabled)
+			SetCheckboxEnabled(panel._buiCooldownManagerWindwalker, enabled)
+		end
+		panel._buiCooldownManagerEnable:HookScript("OnClick", panel._buiRefreshCooldownManagerEnabledState)
+		panel._buiRefreshCooldownManagerEnabledState()
+		section:SetContentHeight(-y + 4)
+	end
+
+	do
 		local section = CreateCollapsibleSection(panel, root, "spellHistory", "Spell History")
 		local content = section.Content
 		local y = -4
@@ -1110,6 +1157,9 @@ local function BuildPanelUI(panel)
 		end
 		if self._buiRefreshPlayerCastBarEnabledState then
 			self._buiRefreshPlayerCastBarEnabledState()
+		end
+		if self._buiRefreshCooldownManagerEnabledState then
+			self._buiRefreshCooldownManagerEnabledState()
 		end
 		if self._buiRefreshMerchantEnabledState then
 			self._buiRefreshMerchantEnabledState()

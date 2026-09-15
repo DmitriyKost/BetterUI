@@ -2,6 +2,7 @@ local ADDON_NAME, NS = ...
 
 local FEATURE_NAME = "CooldownManager"
 local DECIMAL_THRESHOLD = 10
+local WINDWALKER_SPEC_ID = 269
 
 -- Heart of the Jade Serpent
 local HOTJS_BASE_SPELL_ID = 443294
@@ -39,6 +40,34 @@ editModeRefreshDriver:Hide()
 -- of attaching permanent AuraContainers to pooled item identities.
 local hotjsOverlay
 local originalCountdownThresholds = setmetatable({}, { __mode = "k" })
+
+local function GetDB()
+	return _G.BetterUIDB or NS.DB or {}
+end
+
+local function DecimalTimersEnabled()
+	return GetDB().cooldownManagerShowTenths and true or false
+end
+
+local function IsWindwalker()
+	if not GetSpecialization or not GetSpecializationInfo then
+		return false
+	end
+
+	local specializationIndex = GetSpecialization()
+
+	if not specializationIndex then
+		return false
+	end
+
+	local specializationID = GetSpecializationInfo(specializationIndex)
+
+	return specializationID == WINDWALKER_SPEC_ID
+end
+
+local function WindwalkerTweaksEnabled()
+	return GetDB().cooldownManagerWindwalkerHotJS and IsWindwalker() or false
+end
 
 local function ArmEditModeRefresh()
 	Feature._editModeRefreshUntil = GetTime() + EDIT_MODE_REFRESH_DURATION
@@ -444,6 +473,17 @@ local function ScanBuffIconViewer()
 		return
 	end
 
+	local decimalTimersEnabled = DecimalTimersEnabled()
+	local windwalkerTweaksEnabled = WindwalkerTweaksEnabled()
+
+	if not decimalTimersEnabled then
+		RestoreCountdownThresholds()
+	end
+
+	if not windwalkerTweaksEnabled then
+		DetachHotJSOverlay(hotjsOverlay)
+	end
+
 	local viewer = _G.BuffIconCooldownViewer
 	local pool = viewer and viewer.itemFramePool
 
@@ -451,26 +491,30 @@ local function ScanBuffIconViewer()
 		return
 	end
 
-	if not hotjsOverlay and not InCombatLockdown() then
+	-- Blizzard_AuraContainer is loaded lazily only for Windwalker and only
+	-- when the Heart of the Jade Serpent fix is enabled.
+	if windwalkerTweaksEnabled and not hotjsOverlay and not InCombatLockdown() then
 		CreateHotJSOverlay(viewer)
 	end
 
 	local activeHotJSItem
 
 	for item in pool:EnumerateActive() do
-		if item.Cooldown then
+		if item.Cooldown and decimalTimersEnabled then
 			ApplyCountdownThreshold(item.Cooldown)
+		end
 
-			if IsHeartOfJadeSerpentItem(item) then
-				activeHotJSItem = item
-			end
+		if windwalkerTweaksEnabled and IsHeartOfJadeSerpentItem(item) then
+			activeHotJSItem = item
 		end
 	end
 
-	if activeHotJSItem then
-		AttachHotJSOverlay(activeHotJSItem)
-	else
-		DetachHotJSOverlay(hotjsOverlay)
+	if windwalkerTweaksEnabled then
+		if activeHotJSItem then
+			AttachHotJSOverlay(activeHotJSItem)
+		else
+			DetachHotJSOverlay(hotjsOverlay)
+		end
 	end
 end
 
@@ -514,6 +558,11 @@ EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", OnCooldow
 
 editModeRefreshDriver:SetScript("OnUpdate", function(self, elapsed)
 	if not Feature._enabled then
+		self:Hide()
+		return
+	end
+
+	if not DecimalTimersEnabled() and not WindwalkerTweaksEnabled() then
 		self:Hide()
 		return
 	end
@@ -586,6 +635,10 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	end
 
 	if not Feature._enabled then
+		return
+	end
+
+	if event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 and arg1 ~= "player" then
 		return
 	end
 

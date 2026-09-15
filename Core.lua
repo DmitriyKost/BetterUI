@@ -28,6 +28,9 @@ local defaults = {
 	playerCastBarWidth = 240,
 	playerCastBarHeight = 18,
 	playerCastBarDisableGlowAnimations = false,
+	enableCooldownManager = true,
+	cooldownManagerShowTenths = true,
+	cooldownManagerWindwalkerHotJS = true,
 	enableSpellHistory = false,
 	spellHistoryLocked = false,
 	spellHistoryIconSize = 38,
@@ -130,6 +133,7 @@ function NS.ApplySettings()
 	ApplyFeature("Performance", db.enablePerformanceMonitor)
 	ApplyFeature("SpellHistory", db.enableSpellHistory)
 	ApplyFeature("PlayerCastBar", db.enablePlayerCastBar)
+	ApplyFeature("CooldownManager", db.enableCooldownManager)
 	ApplyFeature("ActionBarBorders", true)
 	ApplyFeature("ActionBarMacroText", true)
 	ApplyFeature("ActionBarClickThrough", true)
@@ -137,5 +141,4 @@ function NS.ApplySettings()
 	ApplyFeature("CharacterEquipmentAudit", db.enableCharacterEquipmentAudit)
 	ApplyFeature("MerchantAssistant", true)
 	ApplyFeature("MythicPlusTweaks", db.enableMythicPlusTweaks)
-	ApplyFeature("CooldownManager", true)
 end
